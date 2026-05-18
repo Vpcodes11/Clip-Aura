@@ -164,8 +164,7 @@ CAPTION_STYLES = {
         "back_color": "&H00000000",
         "bold": True,
         "outline": 10,
-        "shadow": 0,
-        "alignment": 2,
+        "margin_v": 80, # Optimized bottom position (Below the video)
     },
     "stealth_pro": {
         "font": "Outfit", 
@@ -179,6 +178,48 @@ CAPTION_STYLES = {
         "shadow": 12,
         "alignment": 2,
         "margin_v": 120,
+    },
+    "hormozi": {
+        # Alex Hormozi style: high-contrast yellow/white alternating, power pops
+        "font": "Montserrat Black",
+        "fontsize": 105,
+        "primary_color": "&H0000FFFF",    # Yellow (inactive word)
+        "highlight_color": "&H00FFFFFF",  # White (active/karaoke word)
+        "outline_color": "&H00000000",
+        "back_color": "&H00000000",
+        "bold": True,
+        "outline": 8,
+        "shadow": 6,
+        "alignment": 2,
+        "margin_v": 120,
+    },
+    "ali_abdaal": {
+        # Ali Abdaal style: clean, minimal, educational — centered on semi-transparent panel
+        "font": "Inter",
+        "fontsize": 72,
+        "primary_color": "&H00FFFFFF",    # White active
+        "highlight_color": "&H00CCCCCC",  # Light grey inactive
+        "outline_color": "&H00000000",
+        "back_color": "&H99000000",        # Semi-transparent dark box
+        "bold": True,
+        "outline": 0,
+        "shadow": 0,
+        "alignment": 5,                    # Center-aligned
+        "margin_v": 200,
+    },
+    "beast_mode": {
+        # MrBeast style: giant, bold, aggressive, max energy
+        "font": "Montserrat Black",
+        "fontsize": 130,
+        "primary_color": "&H000000FF",    # Red active
+        "highlight_color": "&H00FFFFFF",  # White inactive
+        "outline_color": "&H00000000",
+        "back_color": "&H00000000",
+        "bold": True,
+        "outline": 14,
+        "shadow": 0,
+        "alignment": 2,
+        "margin_v": 80,
     },
 }
 
@@ -218,3 +259,6 @@ REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379/0')
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
 STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
 STRIPE_PRO_PRICE_ID = os.getenv('STRIPE_PRO_PRICE_ID')
+
+# B-Roll (Pexels API — optional, leave blank to disable)
+PEXELS_API_KEY = os.getenv('PEXELS_API_KEY', '')

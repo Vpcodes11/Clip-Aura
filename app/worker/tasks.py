@@ -5,12 +5,14 @@ import math
 from app.worker.celery_app import celery_app
 from app.api.database import SessionLocal, engine, Base
 from app.api.models import Job, User
-from app.config import GROQ_API_KEY, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, OUTPUT_DIR, STORAGE_MODE
+from app.config import GROQ_API_KEY, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, OUTPUT_DIR, STORAGE_MODE, PEXELS_API_KEY
 from app.core.transcriber import transcribe
 from app.core.analyzer import analyze_transcript
 from app.core.clipper import create_clip, generate_thumbnail, get_video_info
 from app.core.downloader import download_video
 from app.core.storage import storage
+from app.core.cut_aligner import align_clip_boundaries
+from app.core.broll import apply_broll
 
 # Ensure tables exist for the worker
 Base.metadata.create_all(bind=engine)
@@ -88,6 +90,10 @@ def process_video_job(job_id):
         # Step 2: Analyze for viral moments
         clips_info = analyze_transcript(transcript, GROQ_API_KEY, progress_cb, provider)
 
+        # --- UPGRADE 3: Snap clip boundaries to natural speech pauses ---
+        progress_cb("Aligning clip cuts to natural speech pauses...", 72)
+        clips_info = align_clip_boundaries(clips_info, transcript['words'])
+
         # Step 3: Create clips + thumbnails (PARALLEL PROCESSING)
         output_dir = OUTPUT_DIR / job_id
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -123,6 +129,21 @@ def process_video_job(job_id):
 
         # Finalize results
         for i, clip_info in enumerate(clips_info):
+            output_path = str(output_dir / f"clip_{i+1}.mp4")
+            thumb_path = str(output_dir / f"thumb_{i+1}.jpg")
+
+            # --- UPGRADE 4: B-Roll overlay (runs if PEXELS_API_KEY is set) ---
+            if PEXELS_API_KEY:
+                progress_cb(f"Adding B-Roll to clip {i+1}...", 95 + i)
+                work_dir = str(output_dir)
+                final_path = apply_broll(
+                    output_path, clip_info, transcript['words'],
+                    transcript_data['full_text'], work_dir, PEXELS_API_KEY
+                )
+                # If broll produced a new file, rename it to the standard clip name
+                if final_path != output_path:
+                    import shutil
+                    shutil.move(final_path, output_path)
             output_path = str(output_dir / f"clip_{i+1}.mp4")
             thumb_path = str(output_dir / f"thumb_{i+1}.jpg")
 

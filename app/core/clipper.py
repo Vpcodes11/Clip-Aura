@@ -198,7 +198,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 def create_clip(video_path, clip_info, words, output_path, clip_index,
                 progress_callback=None, caption_style=None, preset="tiktok", is_pro=False):
     """
-    Create a single clip with Dynamic Face Tracking and Viral Hook Headlines.
+    Create a single clip with True Dynamic Face Tracking and Viral Hook Headlines.
+
+    Upgrades implemented:
+    - Upgrade 1: True dynamic panning via FFmpeg sendcmd file (camera follows speaker)
+    - Upgrade 2: Active speaker detection (picks the talking face, not just the biggest)
     """
     start = clip_info['start_time']
     end = clip_info['end_time']
@@ -211,7 +215,7 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
     if progress_callback:
         progress_callback(f"Analyzing AI face tracking for clip {clip_index+1}...", 72 + clip_index * 2)
 
-    # 1. Get Dynamic Tracking Data
+    # 1. Get Dynamic Tracking Data (now uses active speaker + Gaussian smoothing)
     tracking = tracker.get_dynamic_crop_coordinates(video_path, start, end, tw, th)
 
     if progress_callback:
@@ -226,38 +230,50 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
     ass_escaped = ass_path.replace('\\', '/').replace(':', '\\:')
     src_w, src_h, _ = get_video_info(video_path)
 
+    watermark = (
+        "" if is_pro
+        else ",drawtext=text='Created with Clipaura':x=W-tw-20:y=H-th-20:"
+             "fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5"
+    )
+
     # 3. Build Filter Complex
     if tracking and preset in ("tiktok", "youtube_shorts"):
-        # Dynamic Cropping based on face coordinates
         cw = tracking['crop_w']
         ch = tracking['crop_h']
-        
-        # Build the dynamic X expression for FFmpeg
-        # We use 'sendcmd' or just a massive nested 'if' (simple for small data)
-        # But the most robust way is to use the median center if we want to avoid complexity
-        # For now, let's use the first coordinate as a stable base for the clip
-        first_x = list(tracking['coords'].values())[0]
-        
-        # Dynamic Crop + Blur Background
+        coords = tracking['coords']
+
+        # ---------------------------------------------------------------
+        # UPGRADE 1: TRUE DYNAMIC PANNING via sendcmd
+        # Instead of locking to first_x, we write a sendcmd script that
+        # instructs FFmpeg to update crop x at every 0.2s sample point.
+        # ---------------------------------------------------------------
+        sendcmd_path = os.path.join(work_dir, f"pan_{clip_index}.txt")
+        tracker.generate_sendcmd_file(tracking, sendcmd_path)
+        sendcmd_escaped = sendcmd_path.replace('\\', '/').replace(':', '\\:')
+
+        # We use crop with a starting x of first coord; sendcmd updates it in real time
+        first_x = list(coords.values())[0]
+
         filter_complex = (
-            f"[0:v]crop={cw}:{ch}:{first_x}:0,scale={tw}:{th}[vid];"
-            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Clipaura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
+            f"[0:v]sendcmd=f='{sendcmd_escaped}',crop={cw}:{ch}:{first_x}:0,"
+            f"scale={tw}:{th}[vid];"
+            f"[vid]ass='{ass_escaped}'{watermark}[out]"
         )
     elif preset in ("tiktok", "youtube_shorts") and src_w > src_h:
-        # Standard Landscape-on-Blur if tracking fails
+        # Standard landscape-on-blur fallback if face tracking found nothing
         filter_complex = (
             f"[0:v]scale={tw}:{th}:force_original_aspect_ratio=increase,"
             f"crop={tw}:{th},boxblur=25:5[bg];"
             f"[0:v]scale={tw}:-2[fg];"
             f"[bg][fg]overlay=(W-w)/2:(H-h)/2[vid];"
-            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Clipaura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
+            f"[vid]ass='{ass_escaped}'{watermark}[out]"
         )
     else:
-        # Standard fit
+        # Standard letterbox fit
         filter_complex = (
             f"[0:v]scale={tw}:{th}:force_original_aspect_ratio=decrease,"
             f"pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2:black[vid];"
-            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Clipaura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
+            f"[vid]ass='{ass_escaped}'{watermark}[out]"
         )
 
     video_encoder = 'libx264'
@@ -286,6 +302,23 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
 
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        raise RuntimeError(f"FFmpeg failed: {result.stderr[-500:]}")
+        # sendcmd may not be available — fall back to static crop
+        print(f"[Clipper] sendcmd failed, falling back to static crop: {result.stderr[-300:]}")
+        first_x = list(tracking['coords'].values())[0] if tracking else src_w // 2 - (tw // 2)
+        filter_complex_fallback = (
+            f"[0:v]crop={tracking['crop_w']}:{tracking['crop_h']}:{first_x}:0,"
+            f"scale={tw}:{th}[vid];"
+            f"[vid]ass='{ass_escaped}'{watermark}[out]"
+        ) if tracking else (
+            f"[0:v]scale={tw}:{th}:force_original_aspect_ratio=decrease,"
+            f"pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2:black[vid];"
+            f"[vid]ass='{ass_escaped}'{watermark}[out]"
+        )
+        cmd[-2] = output_path
+        cmd[cmd.index('-filter_complex') + 1] = filter_complex_fallback
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"FFmpeg failed: {result.stderr[-500:]}")
 
     return output_path
+
