@@ -3,6 +3,10 @@ import os
 import re
 import yt_dlp
 
+# Optional: path to cookies.txt file for YouTube bot bypass
+# Mount your exported cookies file at /app/cookies.txt in Docker
+COOKIES_FILE = "/app/cookies.txt"
+
 
 def is_valid_url(url):
     """Check if the string looks like a valid video URL"""
@@ -68,7 +72,16 @@ def download_video(url, output_dir, progress_callback=None):
         'quiet': True,
         'no_warnings': True,
         'progress_hooks': [progress_hook],
+        # Mimic a real browser to avoid bot detection
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+        },
     }
+
+    # Use cookies file if available (bypasses YouTube bot detection)
+    if os.path.isfile(COOKIES_FILE):
+        ydl_opts['cookiefile'] = COOKIES_FILE
+        print(f"[Downloader] Using cookies file: {COOKIES_FILE}")
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
