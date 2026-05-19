@@ -1,8 +1,8 @@
-# 🎬 Opus Pro — AI Viral Clip Engine
+# 🎬 Clipaura — AI Viral Clip Engine
 
-![Opus Pro Banner](https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop)
+![Clipaura Banner](https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop)
 
-**Opus Pro** is a high-performance, open-source AI video clipping engine that transforms long-form content (podcasts, streams, interviews) into viral short-form clips for TikTok, Reels, and YouTube Shorts. 
+**Clipaura** is a high-performance, open-source AI video clipping engine that transforms long-form content (podcasts, streams, interviews) into viral short-form clips for TikTok, Reels, and YouTube Shorts. 
 
 Built with **FastAPI**, **Celery**, **Whisper**, and **LLaMA 3**, it handles the entire pipeline: from URL downloading and AI transcription to face-tracking crops and animated "Typography Motion" captions.
 
@@ -37,8 +37,8 @@ Built with **FastAPI**, **Celery**, **Whisper**, and **LLaMA 3**, it handles the
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-username/Opus-Pro.git
-cd Opus-Pro
+git clone https://github.com/your-username/Clipaura.git
+cd Clipaura
 ```
 
 ### 2. Configure Environment
@@ -59,7 +59,7 @@ The app will be live at **[http://localhost:8000](http://localhost:8000)**.
 ## 📁 Project Structure
 
 ```text
-Opus-Pro/
+Clipaura/
 ├── app/
 │   ├── api/          # FastAPI Routes, Auth, Database Models
 │   ├── core/         # AI Logic (Clipping, Tracking, Transcription)

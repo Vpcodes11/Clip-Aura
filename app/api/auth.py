@@ -28,7 +28,7 @@ async def get_current_user(
     if DEV_MODE:
         # Bypass Supabase and return a mock 'Dev Architect' user
         user_id = "dev-architect-id"
-        email = "dev@opuspro.local"
+        email = "dev@clipaura.local"
         print(f"DEBUG: [DEV_MODE ACTIVE] Bypassing auth for: {email}")
     else:
         credentials_exception = HTTPException(
@@ -60,7 +60,7 @@ async def get_current_user(
     
     # Create user if they don't exist yet
     if not user:
-        is_dev = email == "dev@opuspro.local"
+        is_dev = email == "dev@clipaura.local"
         user = User(
             id=user_id,
             email=email,

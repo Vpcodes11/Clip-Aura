@@ -32,7 +32,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("🛠️ [DEV_MODE] Simulating Auth Session...");
       const mockUser = {
         id: 'dev-architect-id',
-        email: 'dev@opuspro.local',
+        email: 'dev@clipaura.local',
         user_metadata: { full_name: 'Dev Architect' }
       } as any;
       

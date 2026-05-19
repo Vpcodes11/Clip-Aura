@@ -22,7 +22,7 @@ def check_database():
     db_url = os.getenv("DATABASE_URL")
     if db_url and "[YOUR_PASSWORD]" not in db_url:
         print("[OK] Production PostgreSQL detected in .env")
-    elif os.path.exists("opus_pro.db"):
+    elif os.path.exists("clipaura.db"):
         print("[OK] Local SQLite database found.")
     else:
         print("[WARN] No database found. (Run the backend once to initialize)")

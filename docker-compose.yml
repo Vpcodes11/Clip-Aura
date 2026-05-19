@@ -14,7 +14,7 @@ services:
       - ./uploads:/app/uploads
       - ./output:/app/output
       - ./temp:/app/temp
-      - ./opus_pro.db:/app/opus_pro.db
+      - ./clipaura.db:/app/clipaura.db
     env_file:
       - .env
     environment:
@@ -31,7 +31,7 @@ services:
       - ./uploads:/app/uploads
       - ./output:/app/output
       - ./temp:/app/temp
-      - ./opus_pro.db:/app/opus_pro.db
+      - ./clipaura.db:/app/clipaura.db
     env_file:
       - .env
     environment:

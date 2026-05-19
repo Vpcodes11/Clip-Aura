@@ -9,7 +9,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 if not DATABASE_URL:
     # Build a local SQLite URL as fallback
-    DATABASE_URL = f"sqlite:///{BASE_DIR}/opus_pro.db"
+    DATABASE_URL = f"sqlite:///{BASE_DIR}/clipaura.db"
 
 # SQLite requires different arguments than PostgreSQL
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}

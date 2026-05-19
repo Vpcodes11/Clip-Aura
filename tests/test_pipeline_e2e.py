@@ -13,7 +13,7 @@ def run_e2e_test():
         if not user:
             user = User(
                 id=user_id,
-                email="dev@opuspro.local",
+                email="dev@clipaura.local",
                 subscription_tier="pro",
                 total_minutes_limit=100,
                 used_minutes=0

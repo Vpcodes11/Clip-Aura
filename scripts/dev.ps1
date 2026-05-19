@@ -1,5 +1,9 @@
 # Clipaura Development Helper Script
 
+param (
+    [Parameter(Mandatory=$false)][string]$action = "help"
+)
+
 function Show-Help {
     Write-Host "Clipaura Dev Tools" -ForegroundColor Cyan
     Write-Host "-------------------"
@@ -9,10 +13,6 @@ function Show-Help {
     Write-Host "test     : Run smoke tests"
     Write-Host "clean    : Remove temporary outputs and caches"
 }
-
-param (
-    [Parameter(Mandatory=$false)][string]$action = "help"
-)
 
 switch ($action) {
     "run" {
@@ -27,7 +27,7 @@ switch ($action) {
         docker-compose logs -f web
     }
     "test" {
-        python .\scripts\smoke_test.py
+        python .\smoke_test.py
     }
     "clean" {
         Remove-Item -Recurse -Force .\outputs\* -ErrorAction SilentlyContinue

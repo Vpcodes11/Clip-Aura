@@ -286,7 +286,7 @@ async def get_websocket_user(token: str, db: Session):
     DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
     if DEV_MODE:
         user_id = "dev-architect-id"
-        email = "dev@opuspro.local"
+        email = "dev@clipaura.local"
     else:
         try:
             res = supabase.auth.get_user(token)
