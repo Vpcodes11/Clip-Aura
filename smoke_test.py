@@ -51,7 +51,7 @@ def check_frontend():
         print("[ERROR] Frontend folder not found.")
 
 if __name__ == "__main__":
-    print("--- OPUS PRO PRODUCTION SMOKE TEST ---\n")
+    print("--- CLIPAURA PRODUCTION SMOKE TEST ---\n")
     check_backend()
     check_database()
     check_celery()

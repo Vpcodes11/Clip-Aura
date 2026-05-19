@@ -74,6 +74,7 @@ def process_video_job(job_id):
             'full_text': transcript['full_text'],
             'duration': duration,
             'word_count': len(transcript['words']),
+            'words': transcript['words'],
         }
         
         job.transcript = transcript_data
@@ -140,7 +141,12 @@ def process_video_job(job_id):
                 'hashtags': clip_info.get('hashtags', []),
                 'start_time': clip_info['start_time'],
                 'end_time': clip_info['end_time'],
-                'duration': round(clip_info['end_time'] - clip_info['start_time'], 1)
+                'duration': round(clip_info['end_time'] - clip_info['start_time'], 1),
+                'words': [
+                    {'word': w['word'], 'start': w['start'], 'end': w['end']}
+                    for w in transcript['words']
+                    if w['start'] >= clip_info['start_time'] - 0.3 and w['end'] <= clip_info['end_time'] + 0.3
+                ]
             })
 
         job.clips = clip_results

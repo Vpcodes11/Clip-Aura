@@ -15,11 +15,20 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = async () => {
-    if (!file && !url) return;
+    if (activeTab === 'upload' && !file) {
+      setError('Please select an intelligence asset to upload.');
+      return;
+    }
+    if (activeTab === 'url' && !url) {
+      setError('Please paste a valid YouTube or video link.');
+      return;
+    }
     
+    setError(null);
     setIsUploading(true);
     try {
       const formData = new FormData();
@@ -32,13 +41,13 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
       // Default presets for now
       formData.append('preset', 'tiktok');
       formData.append('caption_style', 'typography_motion');
-
+ 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await authenticatedFetch(`${apiUrl}/api/upload`, {
         method: 'POST',
         body: formData,
       });
-
+ 
       if (!response.ok) throw new Error('Upload failed');
       
       const data = await response.json();
@@ -51,6 +60,11 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const handleTabChange = (tab: 'upload' | 'url') => {
+    setActiveTab(tab);
+    setError(null);
   };
 
   return (
@@ -75,13 +89,13 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
             <div className="modal-tabs">
               <button 
                 className={`modal-tab ${activeTab === 'upload' ? 'active' : ''}`}
-                onClick={() => setActiveTab('upload')}
+                onClick={() => handleTabChange('upload')}
               >
                 <Upload size={16} /> Upload Video
               </button>
               <button 
                 className={`modal-tab ${activeTab === 'url' ? 'active' : ''}`}
-                onClick={() => setActiveTab('url')}
+                onClick={() => handleTabChange('url')}
               >
                 <LinkIcon size={16} /> Paste URL
               </button>
@@ -97,7 +111,10 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
                     type="file" 
                     ref={fileInputRef} 
                     className="hidden" 
-                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    onChange={(e) => {
+                      setFile(e.target.files?.[0] || null);
+                      setError(null);
+                    }}
                     style={{ display: 'none' }}
                   />
                   {file ? (
@@ -119,7 +136,10 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
                     type="text" 
                     placeholder="https://youtube.com/watch?v=..." 
                     value={url}
-                    onChange={(e) => setUrl(e.target.value)}
+                    onChange={(e) => {
+                      setUrl(e.target.value);
+                      setError(null);
+                    }}
                     className="stealth-input"
                   />
                 </div>
@@ -127,9 +147,21 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
             </div>
 
             <div className="modal-footer">
+              <AnimatePresence>
+                {error && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="error-message-tooltip font-semibold text-xs"
+                  >
+                    ⚠️ {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <button 
                 className="glow-button w-full" 
-                disabled={isUploading || (!file && !url)}
+                disabled={isUploading}
                 onClick={handleUpload}
               >
                 {isUploading ? 'Initializing...' : 'Deploy Pipeline'}
@@ -243,6 +275,17 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
             .stealth-input:focus { border-color: var(--accent); }
             
             .w-full { width: 100%; }
+            .error-message-tooltip {
+              background: rgba(239, 68, 68, 0.08);
+              border: 1px solid rgba(239, 68, 68, 0.20);
+              color: #f87171;
+              padding: 10px 14px;
+              border-radius: 8px;
+              text-align: center;
+              width: 100%;
+              margin-bottom: 12px;
+              box-shadow: 0 4px 12px rgba(239, 68, 68, 0.08);
+            }
           `}</style>
         </div>
       )}

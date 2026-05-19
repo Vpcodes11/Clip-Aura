@@ -1,9 +1,13 @@
-"""Opus Pro — AI Video Clipper | FastAPI Server"""
+"""Clipaura — AI Video Clipper | FastAPI Server"""
 import asyncio
 import os
 import uuid
 import shutil
 import json
+import socket
+import urllib.parse
+import ipaddress
+import re
 import redis.asyncio as redis
 from pathlib import Path
 
@@ -18,28 +22,84 @@ from app.api.database import engine, Base, get_db, SessionLocal
 from app.api.models import Job, User
 from app.worker.celery_app import celery_app
 from app.core.storage import storage
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, supabase
 from app.api import payments
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Opus Pro — AI Video Clipper")
+app = FastAPI(title="Clipaura — AI Video Clipper")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# Security Constraints
+ALLOWED_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm'}
+
+def sanitize_filename(filename: str) -> str:
+    """
+    Sanitizes a filename to protect against path traversal (../) attacks
+    and only allows secure, alphanumeric characters.
+    """
+    base = os.path.basename(filename)
+    name, ext = os.path.splitext(base)
+    ext = ext.lower()
+    name = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
+    name = name.strip('_-')
+    if not name:
+        name = "uploaded_source"
+    return f"{name}{ext}"
+
+def is_safe_url(url: str) -> bool:
+    """
+    Validates that a URL points to a public server and is not trying to trigger
+    a Server-Side Request Forgery (SSRF) attack on local or private networks.
+    """
+    try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ('http', 'https'):
+            return False
+            
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+            
+        # Resolve DNS to check all target IP addresses
+        addr_info = socket.getaddrinfo(hostname, None)
+        for info in addr_info:
+            ip_str = info[4][0]
+            ip_obj = ipaddress.ip_address(ip_str)
+            
+            # Block private (RFC 1918), loopback, link-local, and reserved IP ranges
+            if (ip_obj.is_private or 
+                ip_obj.is_loopback or 
+                ip_obj.is_link_local or 
+                ip_obj.is_reserved or 
+                ip_obj.is_multicast):
+                return False
+        return True
+    except Exception:
+        return False
+
+# Configure production-ready CORS origins
+ALLOWED_ORIGINS_ENV = os.getenv("ALLOWED_ORIGINS")
+if ALLOWED_ORIGINS_ENV:
+    origins = [o.strip() for o in ALLOWED_ORIGINS_ENV.split(",") if o.strip()]
+else:
+    origins = [
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:3002",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
         "http://127.0.0.1:3002",
-    ],
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Include Billing Router
 app.include_router(payments.router)
@@ -80,6 +140,30 @@ async def get_presets():
     })
 
 
+async def check_rate_limit(user_id: str, limit: int = 5, window_seconds: int = 60) -> bool:
+    """
+    Redis-based rolling rate limiter to prevent DoS attacks on resource-intensive endpoints.
+    Allows up to `limit` requests per `window_seconds`.
+    """
+    try:
+        key = f"rate_limit:{user_id}"
+        current = await redis_async.get(key)
+        if current is None:
+            await redis_async.set(key, 1, ex=window_seconds)
+            return True
+        
+        count = int(current)
+        if count >= limit:
+            return False
+            
+        await redis_async.incr(key)
+        return True
+    except Exception as e:
+        # Fail open in case of Redis failure to maintain user experience
+        print(f"RATE LIMITER WARNING: Redis communication failed: {str(e)}")
+        return True
+
+
 @app.post("/api/upload")
 async def upload_video(
     file: UploadFile = File(None),
@@ -96,6 +180,14 @@ async def upload_video(
     if user.used_minutes >= user.total_minutes_limit:
         raise HTTPException(status_code=403, detail="You have exhausted your limit. Please upgrade to Pro to continue.")
 
+    # Apply Rate Limiter (Max 5 uploads/imports per minute per user)
+    is_allowed = await check_rate_limit(user.id, limit=5, window_seconds=60)
+    if not is_allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded. You are allowed a maximum of 5 video uploads/imports per minute."
+        )
+
     if not provider:
         provider = DEFAULT_PROVIDER
     job_id = str(uuid.uuid4())[:8]
@@ -104,6 +196,26 @@ async def upload_video(
 
     if url and url.strip():
         # URL download mode
+        clean_url = url.strip()
+        
+        # Enforce SSRF safety validation
+        if not is_safe_url(clean_url):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid or forbidden video URL. Access to internal, loopback, or private networks is strictly prohibited."
+            )
+            
+        # Enforce file extension check if the URL path points to a file
+        parsed_url = urllib.parse.urlparse(clean_url)
+        url_path = parsed_url.path
+        if url_path:
+            suffix = Path(url_path).suffix.lower()
+            if suffix and suffix not in ALLOWED_EXTENSIONS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid video file format in URL. Only the following extensions are allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+                )
+
         new_job = Job(
             id=job_id,
             user_id=user.id,
@@ -112,17 +224,26 @@ async def upload_video(
             preset=preset,
             caption_style=caption_style,
             message='Queuing download...',
-            source=url.strip(),
+            source=clean_url,
             clips=[],
             transcript=None
         )
         db.add(new_job)
         db.commit()
-        celery_app.send_task("tasks.download_and_process_job", args=[job_id, url.strip(), str(job_dir)])
+        celery_app.send_task("tasks.download_and_process_job", args=[job_id, clean_url, str(job_dir)])
         
     elif file:
         # File upload mode
-        video_path = job_dir / file.filename
+        ext = Path(file.filename).suffix.lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid file format. Only the following video extensions are allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+            )
+            
+        safe_name = sanitize_filename(file.filename)
+        video_path = job_dir / safe_name
+        
         with open(video_path, 'wb') as f:
             while chunk := await file.read(1024 * 1024):
                 f.write(chunk)
@@ -136,7 +257,7 @@ async def upload_video(
             preset=preset,
             caption_style=caption_style,
             message='Upload complete, queuing processing...',
-            source=file.filename,
+            source=safe_name,
             clips=[],
             transcript=None
         )
@@ -144,7 +265,7 @@ async def upload_video(
         db.commit()
 
         if STORAGE_MODE == "cloud":
-            storage.upload_file(str(video_path), f"jobs/{job_id}/source/{file.filename}")
+            storage.upload_file(str(video_path), f"jobs/{job_id}/source/{safe_name}")
 
         celery_app.send_task("tasks.process_video_job", args=[job_id])
     else:
@@ -153,10 +274,51 @@ async def upload_video(
     return JSONResponse({'job_id': job_id})
 
 
+
+async def get_websocket_user(token: str, db: Session):
+    """
+    Authenticate a user over WebSockets using the Supabase token.
+    Respects local DEV_MODE settings.
+    """
+    if not token:
+        return None
+        
+    DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
+    if DEV_MODE:
+        user_id = "dev-architect-id"
+        email = "dev@opuspro.local"
+    else:
+        try:
+            res = supabase.auth.get_user(token)
+            if not res.user:
+                return None
+            user_id = res.user.id
+            email = res.user.email
+        except Exception:
+            return None
+
+    return db.query(User).filter(User.id == user_id).first()
+
+
 @app.websocket("/ws/{job_id}")
-async def websocket_endpoint(websocket: WebSocket, job_id: str, db: Session = Depends(get_db)):
-    """WebSocket for real-time progress updates via Redis Pub/Sub"""
+async def websocket_endpoint(websocket: WebSocket, job_id: str, token: str = None, db: Session = Depends(get_db)):
+    """WebSocket for real-time progress updates via Redis Pub/Sub (Authenticated)"""
     await websocket.accept()
+    
+    # Authenticate WebSocket connection
+    user = await get_websocket_user(token, db)
+    if not user:
+        await websocket.send_json({"type": "error", "message": "Authentication failed. Invalid or missing token."})
+        await websocket.close(code=1008)  # Policy Violation
+        return
+        
+    # Verify ownership of requested job
+    job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
+    if not job:
+        await websocket.send_json({"type": "error", "message": "Unauthorized access to this project."})
+        await websocket.close(code=1008)  # Policy Violation
+        return
+
     ws_connections[job_id] = websocket
 
     job = db.query(Job).filter(Job.id == job_id).first()
@@ -277,3 +439,163 @@ async def delete_job(job_id: str, db: Session = Depends(get_db), user: User = De
             shutil.rmtree(d, ignore_errors=True)
 
     return JSONResponse({'success': True})
+
+
+from pydantic import BaseModel
+from typing import List, Optional
+from fastapi import BackgroundTasks
+
+class WordUpdate(BaseModel):
+    word: str
+    start: float
+    end: float
+
+class EditClipRequest(BaseModel):
+    job_id: str
+    filename: str
+    title: str
+    hook_caption: str
+    words: List[WordUpdate]
+    caption_style: Optional[str] = None
+    preset: Optional[str] = None
+
+async def regenerate_clip_in_background(
+    job_id: str, filename: str, words_list: list, caption_style: str, preset: str, is_pro: bool, title: str, hook_caption: str
+):
+    db = SessionLocal()
+    try:
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if not job:
+            return
+            
+        # Update clip info in database
+        updated_clips = []
+        target_clip = None
+        for clip in (job.clips or []):
+            if clip['filename'] == filename:
+                clip['title'] = title
+                clip['hook_caption'] = hook_caption
+                clip['words'] = words_list
+                target_clip = clip
+            updated_clips.append(clip)
+            
+        job.clips = updated_clips
+        job.status = 'processing' # Set to processing so the UI shows regeneration status
+        job.message = f"Regenerating captions for {title}..."
+        db.commit()
+        
+        # Publish progress update to Redis
+        await redis_async.publish(f"job_progress_{job_id}", json.dumps({
+            'type': 'progress',
+            'message': job.message,
+            'progress': 90
+        }))
+        
+        if not target_clip:
+            return
+            
+        # Re-run create_clip to overwrite the existing file
+        video_path = job.video_path
+        output_path = os.path.join(OUTPUT_DIR, job_id, filename)
+        
+        clip_info = {
+            'start_time': target_clip['start_time'],
+            'end_time': target_clip['end_time'],
+            'title': title,
+            'hook_caption': hook_caption
+        }
+        
+        # Run create_clip in a thread-pool executor to avoid blocking the event loop
+        loop = asyncio.get_running_loop()
+        from app.core.clipper import create_clip
+        await loop.run_in_executor(
+            None,
+            lambda: create_clip(
+                video_path=video_path,
+                clip_info=clip_info,
+                words=words_list,
+                output_path=output_path,
+                clip_index=int(filename.split('_')[-1].split('.')[0]) - 1,
+                progress_callback=None,
+                caption_style=caption_style,
+                preset=preset,
+                is_pro=is_pro
+            )
+        )
+        
+        # Mark job as complete again
+        # Fetch fresh ref
+        job = db.query(Job).filter(Job.id == job_id).first()
+        job.status = 'complete'
+        job.message = "Clip caption regeneration complete!"
+        job.progress = 100
+        db.commit()
+        
+        # Notify clients over WebSocket
+        await redis_async.publish(f"job_progress_{job_id}", json.dumps({
+            'type': 'complete',
+            'message': job.message,
+            'clips': job.clips,
+            'transcript': job.transcript
+        }))
+        
+    except Exception as e:
+        print("CAPTION REGENT ERROR:", e)
+        # Attempt recovery to complete
+        try:
+            job = db.query(Job).filter(Job.id == job_id).first()
+            if job:
+                job.status = 'complete'
+                job.message = f"Failed to edit captions: {str(e)}"
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+@app.post("/api/clip/edit")
+async def edit_clip(
+    req: EditClipRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    """
+    Regenerates a specific clip's subtitle captions and text overlays.
+    Enforces subscription tier privileges and runs asynchronously in the background.
+    """
+    job = db.query(Job).filter(Job.id == req.job_id, Job.user_id == user.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Project not found")
+        
+    # Verify clip exists
+    clips = job.clips or []
+    clip_exists = any(c['filename'] == req.filename for c in clips)
+    if not clip_exists:
+        raise HTTPException(status_code=404, detail="Clip not found")
+        
+    # Enforce video path exists
+    if not job.video_path or not os.path.exists(job.video_path):
+        raise HTTPException(status_code=400, detail="Source video has been archived or removed from local storage.")
+        
+    # Map WordUpdate list to normal lists of dicts
+    words_list = [{'word': w.word, 'start': w.start, 'end': w.end} for w in req.words]
+    
+    caption_style = req.caption_style or job.caption_style
+    preset = req.preset or job.preset
+    is_pro = user.subscription_tier == "pro"
+    
+    # Trigger background regeneration
+    background_tasks.add_task(
+        regenerate_clip_in_background,
+        req.job_id,
+        req.filename,
+        words_list,
+        caption_style,
+        preset,
+        is_pro,
+        req.title,
+        req.hook_caption
+    )
+    
+    return {"status": "processing", "message": "Regenerating captions in the background..."}

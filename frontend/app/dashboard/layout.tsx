@@ -37,8 +37,8 @@ export default function DashboardLayout({
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
-          <div className="logo-box">O</div>
-          <div className="logo-name">OPUS PRO</div>
+          <div className="logo-box">C</div>
+          <div className="logo-name">CLIPAURA</div>
         </div>
 
         <nav className="sidebar-nav">

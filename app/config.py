@@ -64,7 +64,7 @@ CAPTION_STYLES = {
         "margin_v": 120,
     },
     "viral": {
-        "font": "Montserrat Black", # Opus Pro favorite
+        "font": "Montserrat Black", # Clipaura favorite
         "fontsize": 110,
         "primary_color": "&H0000D4FF", # Active: Gold
         "highlight_color": "&H00FFFFFF", # Inactive: White

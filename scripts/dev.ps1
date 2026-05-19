@@ -1,7 +1,7 @@
-# Opus Pro Development Helper Script
+# Clipaura Development Helper Script
 
 function Show-Help {
-    Write-Host "Opus Pro Dev Tools" -ForegroundColor Cyan
+    Write-Host "Clipaura Dev Tools" -ForegroundColor Cyan
     Write-Host "-------------------"
     Write-Host "run      : Start the full stack (Docker)"
     Write-Host "stop     : Stop the stack"

@@ -4,7 +4,7 @@ import { AuthProvider } from "@/lib/AuthContext";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Opus Pro — Stealth AI Video Workspace",
+  title: "Clipaura — Stealth AI Video Workspace",
   description: "The elite engine for viral content creation.",
 };
 
@@ -19,7 +19,7 @@ export default function RootLayout({
         <AuthProvider>
           <nav className="stealth-nav">
             <div className="nav-container">
-              <div className="logo-text">OPUS PRO</div>
+              <div className="logo-text">CLIPAURA</div>
               <div className="nav-links">
                 <Link href="/dashboard">Features</Link>
                 <Link href="/dashboard/billing">Pricing</Link>

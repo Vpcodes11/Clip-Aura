@@ -317,14 +317,15 @@ h1, h2, h3, h4 {
 .logo-box {
   width: 32px;
   height: 32px;
-  background: linear-gradient(135deg, var(--accent), #d946ef);
+  background: url('/logo.png') no-repeat center center;
+  background-size: cover;
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
-  font-size: 18px;
-  color: #fff;
+  color: transparent;
+  user-select: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .logo-name {

@@ -3,7 +3,7 @@ from celery import Celery
 from app.config import REDIS_URL
 
 celery_app = Celery(
-    "opus_pro",
+    "video_engine",
     broker=REDIS_URL,
     backend=REDIS_URL,
     include=["app.worker.tasks"]

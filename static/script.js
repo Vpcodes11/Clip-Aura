@@ -1,9 +1,9 @@
 /**
- * Opus Pro Elite — Frontend Logic
+ * Clipaura Elite — Frontend Logic
  * Refined UX with smooth transitions and cinematic states
  */
 
-console.log("Opus Pro script starting...");
+console.log("Clipaura script starting...");
 
 // ============ CONFIG ============
 const SUPABASE_URL = "https://tmvcemupolugzknwhszf.supabase.co";
@@ -316,7 +316,7 @@ authToggleText.addEventListener('click', (e) => {
     if (e.target.id === 'auth-toggle') {
         e.preventDefault();
         currentAuthMode = currentAuthMode === 'login' ? 'signup' : 'login';
-        authTitle.textContent = currentAuthMode === 'login' ? 'Welcome to Opus Pro' : 'Create an Account';
+        authTitle.textContent = currentAuthMode === 'login' ? 'Welcome to Clipaura' : 'Create an Account';
         authSubmit.textContent = currentAuthMode === 'login' ? 'Continue' : 'Sign Up';
         authToggleText.innerHTML = currentAuthMode === 'login' ? 
             `Don't have an account? <a href="#" id="auth-toggle" style="color: var(--primary);">Sign Up</a>` : 

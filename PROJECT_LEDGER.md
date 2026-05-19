@@ -1,8 +1,14 @@
-# 📒 Opus Pro: Project Ledger
+# 📒 Clipaura: Project Ledger
 
 This is the central log of all development actions, feature updates, and usage guides.
 
 ---
+
+## 🗓️ May 17, 2026
+
+### ✅ Completed Actions
+1. **Global Rebrand to Clipaura**: Rebranded all frontend pages, layouts, configuration comments, backend Swagger documents, custom ASS subtitle scripts, and video overlay watermarks.
+2. **Premium Stealth Logo Deployment**: Deployed a luxury, platinum-outlined dark-stealth monogram logo matching the high-end dark slate user interface.
 
 ## 🗓️ May 16, 2026
 

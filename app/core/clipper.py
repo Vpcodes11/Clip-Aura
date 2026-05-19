@@ -7,6 +7,18 @@ from app.config import TARGET_WIDTH, TARGET_HEIGHT, CAPTION_STYLES, DEFAULT_CAPT
 from app.core.face_processor import tracker
 
 
+@functools.lru_cache(maxsize=1)
+def check_nvenc_available():
+    """Check if NVIDIA NVENC encoder is available and can successfully initialize in FFmpeg"""
+    try:
+        # Run a quick 1-frame test encoding to null to verify CUDA and drivers are functional
+        cmd = ['ffmpeg', '-y', '-f', 'lavfi', '-i', 'color=c=black:s=64x64:d=1', '-c:v', 'h264_nvenc', '-t', '0.1', '-f', 'null', '-']
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 @functools.lru_cache(maxsize=32)
 def get_video_info(video_path):
     """Get video width, height, and duration"""
@@ -42,6 +54,7 @@ def generate_thumbnail(video_path, start_time, output_path):
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     return result.returncode == 0
+
 
 
 def format_ass_time(seconds):
@@ -93,7 +106,7 @@ def generate_ass_subtitles(words, clip_start, clip_end, output_path, caption_sty
     bold_flag = -1 if style['bold'] else 0
 
     ass_content = f"""[Script Info]
-Title: Opus Pro Captions
+Title: Clipaura Captions
 ScriptType: v4.00+
 PlayResX: {tw}
 PlayResY: {th}
@@ -228,7 +241,7 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
         # Dynamic Crop + Blur Background
         filter_complex = (
             f"[0:v]crop={cw}:{ch}:{first_x}:0,scale={tw}:{th}[vid];"
-            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Opus Pro':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
+            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Clipaura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
         )
     elif preset in ("tiktok", "youtube_shorts") and src_w > src_h:
         # Standard Landscape-on-Blur if tracking fails
@@ -237,15 +250,22 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
             f"crop={tw}:{th},boxblur=25:5[bg];"
             f"[0:v]scale={tw}:-2[fg];"
             f"[bg][fg]overlay=(W-w)/2:(H-h)/2[vid];"
-            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Opus Pro':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
+            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Clipaura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
         )
     else:
         # Standard fit
         filter_complex = (
             f"[0:v]scale={tw}:{th}:force_original_aspect_ratio=decrease,"
             f"pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2:black[vid];"
-            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Opus Pro':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
+            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Clipaura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
         )
+
+    video_encoder = 'libx264'
+    encoder_args = ['-preset', 'superfast', '-crf', '20']
+    
+    if check_nvenc_available():
+        video_encoder = 'h264_nvenc'
+        encoder_args = ['-preset', 'fast', '-cq', '22']
 
     cmd = [
         'ffmpeg',
@@ -255,9 +275,8 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
         '-filter_complex', filter_complex,
         '-map', '[out]',
         '-map', '0:a?',
-        '-c:v', 'libx264',
-        '-preset', 'superfast',
-        '-crf', '20',
+        '-c:v', video_encoder
+    ] + encoder_args + [
         '-pix_fmt', 'yuv420p',
         '-c:a', 'aac',
         '-b:a', '160k',
