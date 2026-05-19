@@ -79,7 +79,7 @@ def clean_and_parse_json(text):
     return None
 
 
-def analyze_transcript(transcript_data, api_key, progress_callback=None, provider='groq'):
+def _run_analyze_transcript(transcript_data, api_key, progress_callback=None, provider='groq'):
     """Send transcript to LLM to find viral-worthy moments with strict validation"""
     config = LLM_PROVIDERS.get(provider, LLM_PROVIDERS['groq'])
 
@@ -128,9 +128,9 @@ def analyze_transcript(transcript_data, api_key, progress_callback=None, provide
         ])
         
         user_prompt = f"""Here is a section of the podcast transcript with timestamps:
-
+ 
 {segments_text}
-
+ 
 Identify the top 1-3 most viral-worthy moments in this section. Each clip should be 30-90 seconds.
 Return ONLY valid JSON."""
 
@@ -277,3 +277,27 @@ Return ONLY valid JSON."""
         progress_callback(f"Found {len(top_clips)} viral moments!", 70)
 
     return top_clips
+
+
+def analyze_transcript(transcript_data, api_key, progress_callback=None, provider='groq'):
+    """Send transcript to LLM to find viral-worthy moments with automatic OpenAI fallback on rate limit"""
+    try:
+        return _run_analyze_transcript(transcript_data, api_key, progress_callback, provider)
+    except Exception as e:
+        err_msg = str(e).lower()
+        if provider == 'groq' and ("rate_limit" in err_msg or "429" in err_msg or "rate limit" in err_msg):
+            from app.config import OPENAI_API_KEY
+            if OPENAI_API_KEY:
+                if progress_callback:
+                    progress_callback("Groq LLM rate limit hit. Falling back to OpenAI GPT...", 59)
+                print("[Analyzer] Groq rate limit hit. Falling back to OpenAI GPT...")
+                try:
+                    return _run_analyze_transcript(transcript_data, OPENAI_API_KEY, progress_callback, provider='openai')
+                except Exception as openai_err:
+                    raise RuntimeError(f"Analysis failed: Groq rate limit exceeded and OpenAI fallback also failed: {openai_err}")
+            else:
+                raise RuntimeError(
+                    f"Groq LLM rate limit exceeded. Please wait a few minutes, or set "
+                    f"OPENAI_API_KEY in your .env file to enable automatic fallback. Details: {e}"
+                )
+        raise e

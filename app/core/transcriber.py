@@ -138,14 +138,8 @@ def _transcribe_file(client, config, file_path):
     return words, segments
 
 
-def transcribe(video_path, api_key, progress_callback=None, provider='groq'):
-    """
-    Full transcription pipeline:
-    1. Extract audio from video
-    2. Split if needed (>24MB)
-    3. Transcribe via Whisper API with word-level timestamps
-    4. Merge results
-    """
+def _run_transcribe(video_path, api_key, progress_callback=None, provider='groq'):
+    """Helper to run the transcription steps"""
     client, config = get_client(api_key, provider)
 
     # Setup work directory
@@ -215,3 +209,33 @@ def transcribe(video_path, api_key, progress_callback=None, provider='groq'):
         'full_text': full_text,
         'duration': duration
     }
+
+
+def transcribe(video_path, api_key, progress_callback=None, provider='groq'):
+    """
+    Full transcription pipeline with OpenAI fallback on rate limits:
+    1. Extract audio from video
+    2. Split if needed (>24MB)
+    3. Transcribe via Whisper API with word-level timestamps
+    4. Merge results
+    """
+    try:
+        return _run_transcribe(video_path, api_key, progress_callback, provider)
+    except Exception as e:
+        err_msg = str(e).lower()
+        if provider == 'groq' and ("rate_limit" in err_msg or "429" in err_msg or "rate limit" in err_msg):
+            from app.config import OPENAI_API_KEY
+            if OPENAI_API_KEY:
+                if progress_callback:
+                    progress_callback("Groq Whisper rate limit hit. Falling back to OpenAI Whisper...", 12)
+                print("[Transcriber] Groq rate limit hit. Falling back to OpenAI Whisper...")
+                try:
+                    return _run_transcribe(video_path, OPENAI_API_KEY, progress_callback, provider='openai')
+                except Exception as openai_err:
+                    raise RuntimeError(f"Transcription failed: Groq rate limit exceeded and OpenAI fallback also failed: {openai_err}")
+            else:
+                raise RuntimeError(
+                    f"Groq Whisper rate limit exceeded. Please wait a few minutes, or set "
+                    f"OPENAI_API_KEY in your .env file to enable automatic fallback. Details: {e}"
+                )
+        raise e
