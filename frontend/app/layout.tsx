@@ -4,7 +4,7 @@ import { AuthProvider } from "@/lib/AuthContext";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Clipaura — Stealth AI Video Workspace",
+  title: "Clip Aura — Stealth AI Video Workspace",
   description: "The elite engine for viral content creation.",
 };
 
@@ -14,12 +14,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body>
         <AuthProvider>
           <nav className="stealth-nav">
             <div className="nav-container">
-              <div className="logo-text">CLIPAURA</div>
+              <div className="logo-text">CLIP AURA</div>
               <div className="nav-links">
                 <Link href="/dashboard">Features</Link>
                 <Link href="/dashboard/billing">Pricing</Link>

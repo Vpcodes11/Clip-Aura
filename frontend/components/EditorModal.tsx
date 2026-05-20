@@ -2,20 +2,20 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, Play, Pause, Save, RotateCcw, Video, Type, Sliders, Check } from 'lucide-react';
+import { X, Sparkles, Play, Save, RotateCcw, Video, Type, Sliders } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/supabase';
 
-interface Word {
+export interface Word {
   word: string;
   start: number;
   end: number;
 }
 
-interface Clip {
+export interface Clip {
   filename: string;
   title: string;
-  score: number;
-  duration?: string;
+  virality_score: number;
+  duration?: string | number;
   hook_caption?: string;
   words?: Word[];
   start_time: number;
@@ -31,50 +31,45 @@ interface EditorModalProps {
   onSaveSuccess: () => void;
 }
 
+function getMockWords(clip: Clip): Word[] {
+  const mockWords: Word[] = [];
+  const splitText = (clip.title || "").split(/\s+/);
+  const clipStart = clip.start_time || 0;
+  const clipEnd = clip.end_time || 10;
+  const duration = clipEnd - clipStart;
+  const wordDur = duration / Math.max(1, splitText.length);
+
+  splitText.forEach((word, idx) => {
+    if (word.trim()) {
+      mockWords.push({
+        word: word,
+        start: clipStart + idx * wordDur,
+        end: clipStart + (idx + 1) * wordDur
+      });
+    }
+  });
+  return mockWords;
+}
+
 export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, onSaveSuccess }: EditorModalProps) {
-  const [words, setWords] = useState<Word[]>([]);
-  const [title, setTitle] = useState('');
-  const [hookCaption, setHookCaption] = useState('');
+  const [words, setWords] = useState<Word[]>(() => {
+    if (!clip) return [];
+    if (clip.words && clip.words.length > 0) {
+      return JSON.parse(JSON.stringify(clip.words));
+    }
+    return getMockWords(clip);
+  });
+  const [title, setTitle] = useState(() => clip?.title || '');
+  const [hookCaption, setHookCaption] = useState(() => clip?.hook_caption || clip?.title || '');
   const [captionStyle, setCaptionStyle] = useState('typography_motion');
   const [preset, setPreset] = useState('tiktok');
   
   const [isSaving, setIsSaving] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
   const [activeWordIdx, setActiveWordIdx] = useState<number | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-  useEffect(() => {
-    if (clip) {
-      setTitle(clip.title || '');
-      setHookCaption(clip.hook_caption || clip.title || '');
-      
-      if (clip.words && clip.words.length > 0) {
-        setWords(JSON.parse(JSON.stringify(clip.words)));
-      } else {
-        // Safe backward-compatible fallback: generate timestamps from duration
-        const mockWords: Word[] = [];
-        const splitText = (clip.title || "").split(/\s+/);
-        const clipStart = clip.start_time || 0;
-        const clipEnd = clip.end_time || 10;
-        const duration = clipEnd - clipStart;
-        const wordDur = duration / Math.max(1, splitText.length);
-        
-        splitText.forEach((word, idx) => {
-          if (word.trim()) {
-            mockWords.push({
-              word: word,
-              start: clipStart + idx * wordDur,
-              end: clipStart + (idx + 1) * wordDur
-            });
-          }
-        });
-        setWords(mockWords);
-      }
-    }
-  }, [clip, isOpen]);
 
   // Video synchronization effects
   useEffect(() => {
@@ -83,7 +78,6 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
     const interval = setInterval(() => {
       if (videoRef.current) {
         const time = videoRef.current.currentTime;
-        setCurrentTime(time);
         
         // Find matching word
         const globalTime = clip.start_time + time;
@@ -113,7 +107,6 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
     if (videoRef.current && clip) {
       const relativeStart = Math.max(0, word.start - clip.start_time);
       videoRef.current.currentTime = relativeStart;
-      setCurrentTime(relativeStart);
       videoRef.current.play();
       setIsPlaying(true);
     }
@@ -203,7 +196,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             <div className="editor-header">
               <div className="header-title">
                 <Sparkles size={18} className="text-accent" />
-                <h2>Clipaura Studio Editor</h2>
+                <h2>Clip Aura Studio Editor</h2>
                 <span className="badge font-mono">CLIP #{clipIndex + 1}</span>
               </div>
               <button onClick={onClose} className="close-btn"><X size={20} /></button>
@@ -317,7 +310,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                           </div>
                           <input 
                             type="text" 
-                            value={word.word}
+                            value={word.word ?? ''}
                             onChange={(e) => handleWordChange(idx, e.target.value)}
                             onClick={(e) => e.stopPropagation()} 
                             className="word-input"
@@ -345,7 +338,13 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
 
             {/* Footer Buttons */}
             <div className="editor-footer">
-              <button className="reset-btn glass" onClick={() => setWords(JSON.parse(JSON.stringify(clip.words || [])))}>
+              <button className="reset-btn glass" onClick={() => {
+                if (clip.words && clip.words.length > 0) {
+                  setWords(JSON.parse(JSON.stringify(clip.words)));
+                } else {
+                  setWords(getMockWords(clip));
+                }
+              }}>
                 <RotateCcw size={16} /> Reset
               </button>
               <div className="flex gap-4">
@@ -372,12 +371,18 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             .editor-window {
               width: 100%;
               max-width: 980px;
-              max-height: 90vh;
+              height: 95vh;
               display: flex;
               flex-direction: column;
               padding: 24px;
               position: relative;
               overflow: hidden;
+            }
+            @media (min-width: 768px) {
+              .editor-window {
+                height: 80vh;
+                max-height: 800px;
+              }
             }
             .loading-overlay {
               position: absolute;
@@ -428,10 +433,17 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
 
             .editor-layout {
               display: grid;
-              grid-template-columns: 420px 1fr;
+              grid-template-columns: 1fr;
               gap: 24px;
-              height: 520px;
-              overflow: hidden;
+              flex: 1;
+              min-height: 0;
+              overflow-y: auto;
+            }
+            @media (min-width: 768px) {
+              .editor-layout {
+                grid-template-columns: 420px 1fr;
+                overflow: hidden;
+              }
             }
 
             .player-column {
@@ -670,6 +682,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             }
             .mt-4 { margin-top: 16px; }
             .flex { display: flex; }
+            .gap-2 { gap: 8px; }
             .gap-4 { gap: 16px; }
             .items-center { align-items: center; }
           `}</style>

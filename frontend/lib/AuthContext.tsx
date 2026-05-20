@@ -19,26 +19,33 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 });
 
+const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+
+const devUser = {
+  id: 'dev-architect-id',
+  email: 'dev@clip-aura.local',
+  user_metadata: { full_name: 'Dev Architect' }
+} as unknown as User;
+
+const devSession = {
+  user: devUser,
+  access_token: 'dev-token',
+  refresh_token: '',
+  expires_in: 3600,
+  token_type: 'bearer'
+} as unknown as Session;
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(() => isDevMode ? devUser : null);
+
+  const [session, setSession] = useState<Session | null>(() => isDevMode ? devSession : null);
+
+  const [loading, setLoading] = useState(() => !isDevMode);
   const router = useRouter();
 
   useEffect(() => {
-    const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
-
     if (isDevMode) {
-      console.log("🛠️ [DEV_MODE] Simulating Auth Session...");
-      const mockUser = {
-        id: 'dev-architect-id',
-        email: 'dev@clipaura.local',
-        user_metadata: { full_name: 'Dev Architect' }
-      } as any;
-      
-      setUser(mockUser);
-      setSession({ user: mockUser, access_token: 'dev-token' } as any);
-      setLoading(false);
+      console.log("[DEV_MODE] Simulating Auth Session...");
       return;
     }
 
@@ -65,7 +72,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [router]);
+  }, [router, isDevMode]);
 
   const signOut = async () => {
     await supabase.auth.signOut();

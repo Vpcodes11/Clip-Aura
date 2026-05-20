@@ -10,21 +10,21 @@ from app.api.auth import get_current_user
 stripe.api_key = STRIPE_SECRET_KEY
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 
-# Prices (IDs from Stripe Dashboard)
-PRO_PRICE_ID = STRIPE_PRO_PRICE_ID
-
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 
 @router.post("/create-checkout-session")
 async def create_checkout_session(user: User = Depends(get_current_user)):
     """Create a Stripe Checkout session for subscription"""
+    if not STRIPE_SECRET_KEY or not STRIPE_PRO_PRICE_ID:
+        raise HTTPException(status_code=503, detail="Billing is not configured.")
+
     try:
         checkout_session = stripe.checkout.Session.create(
             customer_email=user.email,
             payment_method_types=['card'],
             line_items=[
                 {
-                    'price': PRO_PRICE_ID,
+                    'price': STRIPE_PRO_PRICE_ID,
                     'quantity': 1,
                 },
             ],
@@ -42,6 +42,11 @@ async def create_checkout_session(user: User = Depends(get_current_user)):
 @router.post("/webhook")
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None), db: Session = Depends(get_db)):
     """Stripe webhook to handle subscription lifecycle events"""
+    if not STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Stripe webhook is not configured.")
+    if not stripe_signature:
+        raise HTTPException(status_code=400, detail="Missing Stripe signature.")
+
     payload = await request.body()
 
     try:

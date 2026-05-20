@@ -171,7 +171,7 @@ def overlay_broll_on_clip(main_clip_path: str, broll_entries: list,
             )
             current_video = out_label
 
-        filter_parts[-1] = filter_parts[-1].rstrip(f"[v{len(broll_entries)-1}]") + "[vout]"
+        filter_parts[-1] = filter_parts[-1].removesuffix(f"[v{len(broll_entries)-1}]") + "[vout]"
 
         filter_complex = ";".join(filter_parts)
 

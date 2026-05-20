@@ -1,8 +1,7 @@
 import os
-import sys
-from app.api.database import SessionLocal, Base, engine
+from app.api.database import SessionLocal
 from app.api.models import Job, User
-from app.worker.tasks import process_video_job
+from app.worker.tasks import process_video_job_impl
 
 def run_e2e_test():
     db = SessionLocal()
@@ -13,7 +12,7 @@ def run_e2e_test():
         if not user:
             user = User(
                 id=user_id,
-                email="dev@clipaura.local",
+                email="dev@clip-aura.local",
                 subscription_tier="pro",
                 total_minutes_limit=100,
                 used_minutes=0
@@ -45,6 +44,7 @@ def run_e2e_test():
             id=job_id,
             user_id=user_id,
             status='queued',
+            stage='queued',
             video_path=video_path,
             provider='groq',
             preset='landscape',
@@ -52,6 +52,7 @@ def run_e2e_test():
             message='Queuing test run...',
             source='test_video.mp4',
             clips=[],
+            errors=[],
             transcript=None
         )
         db.add(test_job)
@@ -59,8 +60,8 @@ def run_e2e_test():
         print(f"[OK] Queued test job: {job_id}")
 
         # 4. Execute the background worker routine synchronously
-        print("🚀 Executing video processing pipeline (Transcribe -> Analyze -> Clip)...")
-        result = process_video_job(job_id)
+        print("Executing video processing pipeline (Transcribe -> Analyze -> Clip)...")
+        result = process_video_job_impl(job_id)
         print(f"Result: {result}")
 
         # 5. Verify results
@@ -80,6 +81,8 @@ def run_e2e_test():
             print(f"FAIL: Job failed with error: {job.message}")
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"[ERROR] Exception during test: {e}")
     finally:
         db.close()

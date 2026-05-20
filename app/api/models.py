@@ -38,7 +38,10 @@ class Job(Base):
     caption_style = Column(String, nullable=True)
     
     transcript = Column(JSON, nullable=True)
+    clip_candidates = Column(JSON, nullable=True)
     clips = Column(JSON, nullable=True)
+    errors = Column(JSON, nullable=True)
+    stage = Column(String, default="queued")
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)

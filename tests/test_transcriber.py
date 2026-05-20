@@ -1,10 +1,10 @@
 import pytest
 from unittest.mock import patch
-from transcriber import get_client, PROVIDERS
+from app.core.transcriber import get_client, PROVIDERS
 
 def test_get_client_groq_provider():
     api_key = "test_groq_key"
-    with patch("transcriber.OpenAI") as mock_openai:
+    with patch("app.core.transcriber.OpenAI") as mock_openai:
         client, config = get_client(api_key, provider="groq")
 
         mock_openai.assert_called_once_with(
@@ -16,7 +16,7 @@ def test_get_client_groq_provider():
 
 def test_get_client_openai_provider():
     api_key = "test_openai_key"
-    with patch("transcriber.OpenAI") as mock_openai:
+    with patch("app.core.transcriber.OpenAI") as mock_openai:
         client, config = get_client(api_key, provider="openai")
 
         mock_openai.assert_called_once_with(
@@ -27,7 +27,7 @@ def test_get_client_openai_provider():
 
 def test_get_client_unknown_provider_fallback():
     api_key = "test_unknown_key"
-    with patch("transcriber.OpenAI") as mock_openai:
+    with patch("app.core.transcriber.OpenAI") as mock_openai:
         client, config = get_client(api_key, provider="unknown_provider")
 
         mock_openai.assert_called_once_with(
@@ -39,7 +39,7 @@ def test_get_client_unknown_provider_fallback():
 
 def test_get_client_default_provider():
     api_key = "test_default_key"
-    with patch("transcriber.OpenAI") as mock_openai:
+    with patch("app.core.transcriber.OpenAI") as mock_openai:
         client, config = get_client(api_key)
 
         mock_openai.assert_called_once_with(

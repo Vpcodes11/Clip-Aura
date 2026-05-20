@@ -7,6 +7,17 @@ class CloudStorage:
     def __init__(self):
         self.enabled = STORAGE_MODE == "cloud"
         if self.enabled:
+            missing = [
+                name for name, value in {
+                    "S3_ENDPOINT_URL": S3_ENDPOINT_URL,
+                    "S3_ACCESS_KEY": S3_ACCESS_KEY,
+                    "S3_SECRET_KEY": S3_SECRET_KEY,
+                    "S3_BUCKET_NAME": S3_BUCKET_NAME,
+                }.items()
+                if not value
+            ]
+            if missing:
+                raise RuntimeError(f"Cloud storage is enabled but missing: {', '.join(missing)}")
             self.s3 = boto3.client(
                 's3',
                 endpoint_url=S3_ENDPOINT_URL,

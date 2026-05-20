@@ -3,8 +3,9 @@ import subprocess
 import os
 import json
 import functools
-from app.config import TARGET_WIDTH, TARGET_HEIGHT, CAPTION_STYLES, DEFAULT_CAPTION_STYLE, PRESETS
+from app.config import CAPTION_STYLES, DEFAULT_CAPTION_STYLE, PRESETS
 from app.core.face_processor import tracker
+from app.core.preflight import validate_rendered_video
 
 
 @functools.lru_cache(maxsize=1)
@@ -95,6 +96,17 @@ def generate_ass_subtitles(words, clip_start, clip_end, output_path, caption_sty
     tw = preset_config['width']
     th = preset_config['height']
 
+    font = style.get('font', 'Montserrat Black')
+    fontsize = style.get('fontsize', 85)
+    primary_color = style.get('primary_color', '&H00FFFFFF')
+    highlight_color = style.get('highlight_color', '&H0000FFFF')
+    outline_color = style.get('outline_color', '&H00000000')
+    back_color = style.get('back_color', '&H80000000')
+    bold_flag = -1 if style.get('bold', True) else 0
+    outline = style.get('outline', 6)
+    shadow = style.get('shadow', 4)
+    alignment = style.get('alignment', 2)
+
     # Dynamically calculate margin_v
     if tw < th:
         video_h = tw * 9 / 16
@@ -103,10 +115,8 @@ def generate_ass_subtitles(words, clip_start, clip_end, output_path, caption_sty
     else:
         margin_v = style.get('margin_v', 80)
     
-    bold_flag = -1 if style['bold'] else 0
-
     ass_content = f"""[Script Info]
-Title: Clipaura Captions
+Title: Clip Aura Captions
 ScriptType: v4.00+
 PlayResX: {tw}
 PlayResY: {th}
@@ -114,7 +124,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{style['font']},{style['fontsize']},{style['primary_color']},{style['highlight_color']},{style['outline_color']},{style['back_color']},{bold_flag},0,0,0,100,100,0,0,1,{style['outline']},{style['shadow']},{style['alignment']},40,40,{margin_v},1
+Style: Default,{font},{fontsize},{primary_color},{highlight_color},{outline_color},{back_color},{bold_flag},0,0,0,100,100,0,0,1,{outline},{shadow},{alignment},40,40,{margin_v},1
 Style: Hook,Montserrat Black,80,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,10,0,8,40,40,100,1
 
 [Events]
@@ -173,7 +183,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     if clean_word in POWER_WORDS:
                         display_word = raw_word.upper()
                         if random.random() < 0.2: display_word += " " + random.choice(EMOJIS)
-                        part = f"{{\\fn{style['font']}}}{{\\c&H00D4FF&}}{{\\k{duration_cs}}}{display_word} "
+                        part = f"{{\\fn{font}}}{{\\c&H00D4FF&}}{{\\k{duration_cs}}}{display_word} "
                     else:
                         display_word = raw_word.lower()
                         part = f"{{\\fn{sec_font}}}{{\\c&HFFFFFF&}}{{\\k{duration_cs}}}{display_word} "
@@ -186,7 +196,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
             text = "".join(karaoke_parts).strip()
             # Professional Bouncy Animation: Pop in, slight overshoot, then settle
-            animation = f"{{\\an{style['alignment']}\\fad(50,50)\\t(0,80,\\fscx120\\fscy120)\\t(80,160,\\fscx100\\fscy100)}}"
+            animation = f"{{\\an{alignment}\\fad(50,50)\\t(0,80,\\fscx120\\fscy120)\\t(80,160,\\fscx100\\fscy100)}}"
             ass_content += f"Dialogue: 0,{start_ts},{end_ts},Default,,0,0,0,,{animation}{text}\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:
@@ -196,7 +206,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 
 def create_clip(video_path, clip_info, words, output_path, clip_index,
-                progress_callback=None, caption_style=None, preset="tiktok", is_pro=False):
+                progress_callback=None, caption_style=None, preset="tiktok", is_pro=False,
+                force_software=False, render_mode="normal"):
     """
     Create a single clip with True Dynamic Face Tracking and Viral Hook Headlines.
 
@@ -216,7 +227,9 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
         progress_callback(f"Analyzing AI face tracking for clip {clip_index+1}...", 72 + clip_index * 2)
 
     # 1. Get Dynamic Tracking Data (now uses active speaker + Gaussian smoothing)
-    tracking = tracker.get_dynamic_crop_coordinates(video_path, start, end, tw, th)
+    tracking = None
+    if render_mode in ("normal", "static"):
+        tracking = tracker.get_dynamic_crop_coordinates(video_path, start, end, tw, th)
 
     if progress_callback:
         progress_callback(f"Creating viral clip {clip_index + 1}: {clip_info['title']}...", 73 + clip_index * 2)
@@ -232,12 +245,12 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
 
     watermark = (
         "" if is_pro
-        else ",drawtext=text='Created with Clipaura':x=W-tw-20:y=H-th-20:"
+        else ",drawtext=text='Created with Clip Aura':x=W-text_w-20:y=H-text_h-20:"
              "fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5"
     )
 
     # 3. Build Filter Complex
-    if tracking and preset in ("tiktok", "youtube_shorts"):
+    if tracking and preset in ("tiktok", "youtube_shorts") and render_mode == "normal":
         cw = tracking['crop_w']
         ch = tracking['crop_h']
         coords = tracking['coords']
@@ -252,14 +265,23 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
         sendcmd_escaped = sendcmd_path.replace('\\', '/').replace(':', '\\:')
 
         # We use crop with a starting x of first coord; sendcmd updates it in real time
-        first_x = list(coords.values())[0]
+        first_x = coords[sorted(coords.keys())[0]]
 
         filter_complex = (
             f"[0:v]sendcmd=f='{sendcmd_escaped}',crop={cw}:{ch}:{first_x}:0,"
             f"scale={tw}:{th}[vid];"
             f"[vid]ass='{ass_escaped}'{watermark}[out]"
         )
-    elif preset in ("tiktok", "youtube_shorts") and src_w > src_h:
+    elif tracking and preset in ("tiktok", "youtube_shorts") and render_mode == "static":
+        cw = tracking['crop_w']
+        ch = tracking['crop_h']
+        first_x = list(tracking['coords'].values())[0]
+        filter_complex = (
+            f"[0:v]crop={cw}:{ch}:{first_x}:0,"
+            f"scale={tw}:{th}[vid];"
+            f"[vid]ass='{ass_escaped}'{watermark}[out]"
+        )
+    elif preset in ("tiktok", "youtube_shorts") and src_w > src_h and render_mode != "letterbox":
         # Standard landscape-on-blur fallback if face tracking found nothing
         filter_complex = (
             f"[0:v]scale={tw}:{th}:force_original_aspect_ratio=increase,"
@@ -279,7 +301,7 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
     video_encoder = 'libx264'
     encoder_args = ['-preset', 'superfast', '-crf', '20']
     
-    if check_nvenc_available():
+    if not force_software and check_nvenc_available():
         video_encoder = 'h264_nvenc'
         encoder_args = ['-preset', 'fast', '-cq', '22']
 
@@ -321,4 +343,48 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
             raise RuntimeError(f"FFmpeg failed: {result.stderr[-500:]}")
 
     return output_path
+
+
+def safe_create_clip(video_path, clip_info, words, output_path, clip_index,
+                     progress_callback=None, caption_style=None, preset="tiktok", is_pro=False):
+    """Create a clip with progressively safer render settings."""
+    attempts = [
+        ("dynamic", {"force_software": False, "render_mode": "normal"}),
+        ("software_dynamic", {"force_software": True, "render_mode": "normal"}),
+        ("static_crop", {"force_software": True, "render_mode": "static"}),
+        ("letterbox", {"force_software": True, "render_mode": "letterbox"}),
+    ]
+    failures = []
+    log_dir = os.path.join(os.path.dirname(output_path), "logs")
+
+    for label, options in attempts:
+        try:
+            path = create_clip(
+                video_path, clip_info, words, output_path, clip_index,
+                progress_callback, caption_style, preset, is_pro, **options
+            )
+            validate_rendered_video(path)
+            return {
+                "ok": True,
+                "path": path,
+                "attempt": label,
+                "error": None,
+            }
+        except Exception as exc:
+            failures.append(f"{label}: {str(exc)[-500:]}")
+            check_nvenc_available.cache_clear()
+
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+        with open(os.path.join(log_dir, f"clip_{clip_index + 1}_render_errors.log"), "w", encoding="utf-8") as f:
+            f.write("\n\n".join(failures))
+    except Exception:
+        pass
+
+    return {
+        "ok": False,
+        "path": output_path,
+        "attempt": None,
+        "error": " | ".join(failures)[-1500:],
+    }
 

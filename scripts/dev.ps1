@@ -1,11 +1,11 @@
-# Clipaura Development Helper Script
+# Clip Aura Development Helper Script
 
 param (
     [Parameter(Mandatory=$false)][string]$action = "help"
 )
 
 function Show-Help {
-    Write-Host "Clipaura Dev Tools" -ForegroundColor Cyan
+    Write-Host "Clip Aura Dev Tools" -ForegroundColor Cyan
     Write-Host "-------------------"
     Write-Host "run      : Start the full stack (Docker)"
     Write-Host "stop     : Stop the stack"
@@ -27,10 +27,10 @@ switch ($action) {
         docker-compose logs -f web
     }
     "test" {
-        python .\smoke_test.py
+        python .\scripts\smoke_test.py
     }
     "clean" {
-        Remove-Item -Recurse -Force .\outputs\* -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force .\output\*, .\uploads\*, .\temp\* -ErrorAction SilentlyContinue
         Write-Host "🧹 Outputs cleaned" -ForegroundColor Green
     }
     Default {

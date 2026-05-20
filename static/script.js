@@ -1,9 +1,9 @@
 /**
- * Clipaura Elite — Frontend Logic
+ * Clip Aura Elite — Frontend Logic
  * Refined UX with smooth transitions and cinematic states
  */
 
-console.log("Clipaura script starting...");
+console.log("Clip Aura script starting...");
 
 // ============ CONFIG ============
 const SUPABASE_URL = "https://tmvcemupolugzknwhszf.supabase.co";
@@ -229,26 +229,40 @@ startBtn.addEventListener('click', async () => {
 
 function connectWebSocket(jobId) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/${jobId}`);
-
-    ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'progress') {
-            progressFill.style.width = `${data.progress}%`;
-            progressPercent.textContent = `${data.progress}%`;
-            progressMessage.textContent = data.message;
-            updatePipelineSteps(data.message);
-        } 
-        else if (data.type === 'complete') {
-            showResults(data.clips);
-            ws.close();
-        } 
-        else if (data.type === 'error') {
-            showError(data.message);
-            ws.close();
+    
+    // Retrieve token asynchronously and connect
+    (async () => {
+        let token = '';
+        if (supabaseClient) {
+            try {
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                token = session?.access_token || '';
+            } catch (e) {
+                console.error("Failed to get WebSocket token:", e);
+            }
         }
-    };
+        
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws/${jobId}?token=${encodeURIComponent(token)}`);
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'progress') {
+                progressFill.style.width = `${data.progress}%`;
+                progressPercent.textContent = `${data.progress}%`;
+                progressMessage.textContent = data.message;
+                updatePipelineSteps(data.message);
+            } 
+            else if (data.type === 'complete') {
+                showResults(jobId, data.clips);
+                ws.close();
+            } 
+            else if (data.type === 'error') {
+                showError(data.message);
+                ws.close();
+            }
+        };
+    })();
 }
 
 function updatePipelineSteps(message) {
@@ -268,7 +282,7 @@ function updatePipelineSteps(message) {
     }
 }
 
-function showResults(clips) {
+function showResults(jobId, clips) {
     processingSection.classList.add('hidden');
     resultsSection.classList.remove('hidden');
     
@@ -280,18 +294,18 @@ function showResults(clips) {
         card.className = 'clip-card';
         card.innerHTML = `
             <div class="clip-preview">
-                <video src="/api/preview/${clip.job_id}/${clip.filename}" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>
+                <video src="/api/preview/${jobId}/${clip.filename}" muted loop onmouseover="this.play()" onmouseout="this.pause()"></video>
                 <div class="clip-overlay">
-                    <div class="score-badge">SCORE: ${clip.score}/10</div>
-                    <button class="btn-icon glass" style="padding: 8px; border-radius: 50%;" onclick="window.open('/api/download/${clip.job_id}/${clip.filename}')">
+                    <div class="score-badge">SCORE: ${clip.virality_score}/10</div>
+                    <button class="btn-icon glass" style="padding: 8px; border-radius: 50%;" onclick="window.open('/api/download/${jobId}/${clip.filename}')">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     </button>
                 </div>
             </div>
             <div class="clip-info">
                 <h3 class="clip-title">${clip.title}</h3>
-                <p class="clip-description">${clip.explanation}</p>
-                <button class="btn btn-secondary btn-block" style="width: 100%; justify-content: center;" onclick="window.open('/api/download/${clip.job_id}/${clip.filename}')">
+                <p class="clip-description">${clip.reason}</p>
+                <button class="btn btn-secondary btn-block" style="width: 100%; justify-content: center;" onclick="window.open('/api/download/${jobId}/${clip.filename}')">
                     Download HD
                 </button>
             </div>
@@ -316,7 +330,7 @@ authToggleText.addEventListener('click', (e) => {
     if (e.target.id === 'auth-toggle') {
         e.preventDefault();
         currentAuthMode = currentAuthMode === 'login' ? 'signup' : 'login';
-        authTitle.textContent = currentAuthMode === 'login' ? 'Welcome to Clipaura' : 'Create an Account';
+        authTitle.textContent = currentAuthMode === 'login' ? 'Welcome to Clip Aura' : 'Create an Account';
         authSubmit.textContent = currentAuthMode === 'login' ? 'Continue' : 'Sign Up';
         authToggleText.innerHTML = currentAuthMode === 'login' ? 
             `Don't have an account? <a href="#" id="auth-toggle" style="color: var(--primary);">Sign Up</a>` : 

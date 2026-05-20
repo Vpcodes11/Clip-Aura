@@ -41,24 +41,12 @@ def extract_audio(video_path, audio_path):
         raise RuntimeError(f"Audio extraction failed: {result.stderr[-300:]}")
 
 
-def get_audio_duration(audio_path):
-    """Get audio duration in seconds using ffprobe"""
+def get_media_duration(path):
+    """Get audio or video duration in seconds using ffprobe"""
     cmd = [
         'ffprobe', '-v', 'quiet',
         '-show_entries', 'format=duration',
-        '-of', 'json', audio_path
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    data = json.loads(result.stdout)
-    return float(data['format']['duration'])
-
-
-def get_video_duration(video_path):
-    """Get video duration in seconds using ffprobe"""
-    cmd = [
-        'ffprobe', '-v', 'quiet',
-        '-show_entries', 'format=duration',
-        '-of', 'json', video_path
+        '-of', 'json', path
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     data = json.loads(result.stdout)
@@ -67,7 +55,7 @@ def get_video_duration(video_path):
 
 def split_audio(audio_path, chunk_dir, chunk_duration=AUDIO_CHUNK_DURATION):
     """Split audio into chunks to stay under API file size limit"""
-    duration = get_audio_duration(audio_path)
+    duration = get_media_duration(audio_path)
     chunks = []
     start = 0
     i = 0
@@ -197,7 +185,7 @@ def _run_transcribe(video_path, api_key, progress_callback=None, provider='groq'
 
     # Get video duration
     try:
-        duration = get_video_duration(video_path)
+        duration = get_media_duration(video_path)
     except Exception:
         duration = all_segments[-1]['end'] if all_segments else 0
 

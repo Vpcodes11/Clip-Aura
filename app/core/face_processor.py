@@ -6,18 +6,30 @@ Upgrade 2: Active speaker detection via lip-openness scoring across multiple fac
 """
 import cv2
 import numpy as np
-import mediapipe as mp
-from mediapipe.python.solutions import face_detection as mp_face_detection
-from app.config import TARGET_WIDTH, TARGET_HEIGHT
+try:
+    from mediapipe.python.solutions import face_detection as mp_face_detection
+except Exception:
+    try:
+        from mediapipe.solutions import face_detection as mp_face_detection
+    except Exception:
+        mp_face_detection = None
 import os
 
 
 class FaceTracker:
     def __init__(self):
-        self.face_detection = mp_face_detection.FaceDetection(
-            model_selection=1,  # Full-range (within 5m)
-            min_detection_confidence=0.45
-        )
+        self._face_detection = None
+
+    @property
+    def face_detection(self):
+        if mp_face_detection is None:
+            return None
+        if self._face_detection is None:
+            self._face_detection = mp_face_detection.FaceDetection(
+                model_selection=1,  # Full-range (within 5m)
+                min_detection_confidence=0.45
+            )
+        return self._face_detection
 
     # ------------------------------------------------------------------
     # Upgrade 1: Dynamic crop with Gaussian smoothing (cinematic panning)
@@ -31,6 +43,9 @@ class FaceTracker:
 
         Returns a dict: {'crop_w', 'crop_h', 'coords': {timestamp: x_pixel}}
         """
+        if mp_face_detection is None:
+            return None
+
         cap = cv2.VideoCapture(video_path)
         fps = cap.get(cv2.CAP_PROP_FPS)
         src_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -55,7 +70,11 @@ class FaceTracker:
                 break
 
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = self.face_detection.process(rgb_frame)
+            detector = self.face_detection
+            if detector is None:
+                cap.release()
+                return None
+            results = detector.process(rgb_frame)
 
             # Use active speaker detection if multiple faces found
             center_x = self._pick_active_speaker_center(results, frame, src_w, src_h)
@@ -163,10 +182,15 @@ class FaceTracker:
         coords = tracking['coords']
         timestamps = sorted(coords.keys())
 
+        if not timestamps:
+            return output_path
+
+        start_t = min(timestamps)
         for i, ts in enumerate(timestamps):
             x = coords[ts]
+            rel_ts = max(0.0, ts - start_t)
             # FFmpeg sendcmd time is relative to clip start (0-based)
-            lines.append(f"{ts:.2f} [OUT] crop x {x};")
+            lines.append(f"{rel_ts:.2f} [OUT] crop x {x};")
 
         content = "\n".join(lines)
         with open(output_path, 'w') as f:

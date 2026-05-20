@@ -97,7 +97,7 @@ def _run_analyze_transcript(transcript_data, api_key, progress_callback=None, pr
         duration = float(transcript_data['segments'][-1].get('end', 0.0))
 
     # Group segments into chunks to avoid token limits
-    MAX_WORDS_PER_CHUNK = 1000  # approx 1300 tokens
+    MAX_WORDS_PER_CHUNK = 400  # approx 550 tokens
     chunks = []
     current_chunk = []
     current_word_count = 0

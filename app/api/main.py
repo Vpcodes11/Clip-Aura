@@ -1,4 +1,4 @@
-"""Clipaura — AI Video Clipper | FastAPI Server"""
+"""Clip Aura — AI Video Clipper | FastAPI Server"""
 import asyncio
 import os
 import uuid
@@ -10,28 +10,46 @@ import ipaddress
 import re
 import redis.asyncio as redis
 from pathlib import Path
+from typing import List, Optional
 
-from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Depends, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Depends, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.config import UPLOAD_DIR, OUTPUT_DIR, BASE_DIR, PRESETS, CAPTION_STYLES, GROQ_API_KEY, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, STORAGE_MODE
+from app.config import UPLOAD_DIR, OUTPUT_DIR, BASE_DIR, PRESETS, CAPTION_STYLES, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, STORAGE_MODE, DEV_MODE
 from app.api.database import engine, Base, get_db, SessionLocal
 from app.api.models import Job, User
+from app.api.schema_compat import ensure_job_columns
 from app.worker.celery_app import celery_app
 from app.core.storage import storage
-from app.api.auth import get_current_user, supabase
+from app.api.auth import get_current_user, get_supabase_client
 from app.api import payments
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+ensure_job_columns(engine)
 
-app = FastAPI(title="Clipaura — AI Video Clipper")
+app = FastAPI(title="Clip Aura — AI Video Clipper")
 
 # Security Constraints
 ALLOWED_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm'}
+
+
+def resolve_job_file(directory: Path, filename: str) -> Path:
+    """Resolve a user-supplied job filename without allowing path traversal."""
+    safe_name = os.path.basename(filename)
+    if safe_name != filename or not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    filepath = (directory / safe_name).resolve()
+    base = directory.resolve()
+    if base not in filepath.parents:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    return filepath
+
 
 def sanitize_filename(filename: str) -> str:
     """
@@ -108,16 +126,14 @@ app.include_router(payments.router)
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 redis_async = redis.from_url(REDIS_URL)
 
-# Active WebSocket connections
-ws_connections = {}
-
 # Serve static files
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 
 @app.get("/")
 async def root():
-    return FileResponse(str(BASE_DIR / "static" / "index.html"))
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    return RedirectResponse(url=frontend_url)
 
 
 @app.get("/api/me")
@@ -170,7 +186,7 @@ async def upload_video(
     url: str = Form(None),
     provider: str = Form(None),
     preset: str = Form('landscape'),
-    caption_style: str = Form('typography_motion'),
+    caption_style: str = Form(DEFAULT_CAPTION_STYLE),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
@@ -220,12 +236,14 @@ async def upload_video(
             id=job_id,
             user_id=user.id,
             status='downloading',
+            stage='downloading',
             provider=provider,
             preset=preset,
             caption_style=caption_style,
             message='Queuing download...',
             source=clean_url,
             clips=[],
+            errors=[],
             transcript=None
         )
         db.add(new_job)
@@ -252,6 +270,7 @@ async def upload_video(
             id=job_id,
             user_id=user.id,
             status='queued',
+            stage='queued',
             video_path=str(video_path),
             provider=provider,
             preset=preset,
@@ -259,6 +278,7 @@ async def upload_video(
             message='Upload complete, queuing processing...',
             source=safe_name,
             clips=[],
+            errors=[],
             transcript=None
         )
         db.add(new_job)
@@ -280,22 +300,20 @@ async def get_websocket_user(token: str, db: Session):
     Authenticate a user over WebSockets using the Supabase token.
     Respects local DEV_MODE settings.
     """
-    if not token:
-        return None
-        
-    DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
     if DEV_MODE:
         user_id = "dev-architect-id"
-        email = "dev@clipaura.local"
-    else:
-        try:
-            res = supabase.auth.get_user(token)
-            if not res.user:
-                return None
-            user_id = res.user.id
-            email = res.user.email
-        except Exception:
+        return db.query(User).filter(User.id == user_id).first()
+
+    if not token or token in ("null", "undefined", ""):
+        return None
+
+    try:
+        res = get_supabase_client().auth.get_user(token)
+        if not res.user:
             return None
+        user_id = res.user.id
+    except Exception:
+        return None
 
     return db.query(User).filter(User.id == user_id).first()
 
@@ -319,9 +337,6 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str, token: str = Non
         await websocket.close(code=1008)  # Policy Violation
         return
 
-    ws_connections[job_id] = websocket
-
-    job = db.query(Job).filter(Job.id == job_id).first()
     if job:
         initial_msg = {
             'type': 'progress',
@@ -359,7 +374,6 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str, token: str = Non
     except WebSocketDisconnect:
         listen_task.cancel()
         await pubsub.unsubscribe(f"job_progress_{job_id}")
-        ws_connections.pop(job_id, None)
 
 
 @app.get("/api/jobs")
@@ -377,36 +391,58 @@ async def get_status(job_id: str, db: Session = Depends(get_db), user: User = De
         raise HTTPException(status_code=404, detail="Job not found")
     return JSONResponse({
         'status': job.status,
+        'stage': job.stage,
         'progress': job.progress,
         'message': job.message,
         'clips': job.clips or [],
         'transcript': job.transcript,
+        'errors': job.errors or [],
     })
 
 
-@app.get("/api/download/{job_id}/{filename}")
-async def download_clip(job_id: str, filename: str, user: User = Depends(get_current_user)):
-    """Download a generated clip"""
+
+def _cloud_redirect(job_id: str, safe_name: str):
+    """Return a cloud storage redirect response, or None if not applicable."""
     if STORAGE_MODE == "cloud":
-        url = storage.generate_signed_url(f"jobs/{job_id}/{filename}")
+        url = storage.generate_signed_url(f"jobs/{job_id}/{safe_name}")
         if url:
             return RedirectResponse(url)
-    
-    filepath = OUTPUT_DIR / job_id / filename
+    return None
+
+
+@app.get("/api/download/{job_id}/{filename}")
+async def download_clip(job_id: str, filename: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Download a generated clip"""
+    safe_name = os.path.basename(filename)
+    if safe_name != filename or not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    redirect = _cloud_redirect(job_id, safe_name)
+    if redirect:
+        return redirect
+
+    filepath = resolve_job_file(OUTPUT_DIR / job_id, safe_name)
     if not filepath.exists():
         return JSONResponse({'error': 'File not found'}, status_code=404)
-    return FileResponse(str(filepath), filename=filename, media_type='video/mp4')
+    return FileResponse(str(filepath), filename=safe_name, media_type='video/mp4')
 
 
 @app.get("/api/preview/{job_id}/{filename}")
 async def preview_clip(job_id: str, filename: str):
     """Stream clip for in-browser preview (No auth required for simple preview)"""
-    if STORAGE_MODE == "cloud":
-        url = storage.generate_signed_url(f"jobs/{job_id}/{filename}")
-        if url:
-            return RedirectResponse(url)
+    safe_name = os.path.basename(filename)
+    if safe_name != filename or not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
 
-    filepath = OUTPUT_DIR / job_id / filename
+    redirect = _cloud_redirect(job_id, safe_name)
+    if redirect:
+        return redirect
+
+    filepath = resolve_job_file(OUTPUT_DIR / job_id, safe_name)
     if not filepath.exists():
         return JSONResponse({'error': 'File not found'}, status_code=404)
 
@@ -440,10 +476,6 @@ async def delete_job(job_id: str, db: Session = Depends(get_db), user: User = De
 
     return JSONResponse({'success': True})
 
-
-from pydantic import BaseModel
-from typing import List, Optional
-from fastapi import BackgroundTasks
 
 class WordUpdate(BaseModel):
     word: str

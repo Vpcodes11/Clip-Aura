@@ -5,9 +5,12 @@ from unittest.mock import MagicMock
 # Mock dependencies before importing clipper
 sys.modules['dotenv'] = MagicMock()
 sys.modules['mediapipe'] = MagicMock()
+sys.modules['mediapipe.solutions'] = MagicMock()
+sys.modules['mediapipe.python'] = MagicMock()
+sys.modules['mediapipe.python.solutions'] = MagicMock()
 sys.modules['cv2'] = MagicMock()
 
-from clipper import format_ass_time
+from app.core.clipper import format_ass_time
 
 @pytest.mark.parametrize("seconds, expected", [
     (0, "0:00:00.00"),
