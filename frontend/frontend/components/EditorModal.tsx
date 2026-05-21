@@ -95,6 +95,16 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
     return () => clearInterval(interval);
   }, [isPlaying, words, clip]);
 
+  // Escape key closes modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   const handlePlayPause = () => {
     if (videoRef.current) {
       if (isPlaying) {

@@ -73,6 +73,16 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
     loadPresets();
   }, [isOpen]);
 
+  // Escape key closes modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // Reset modal state on open/close
   useEffect(() => {
     if (!isOpen) return;
