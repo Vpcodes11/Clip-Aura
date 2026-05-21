@@ -1,23 +1,28 @@
-# 📒 Opus Pro: Project Ledger
+# 📒 Clip Aura: Project Ledger
 
 This is the central log of all development actions, feature updates, and usage guides.
 
 ---
 
+## 🗓️ May 17, 2026
+
+### ✅ Completed Actions
+1. **Global Rebrand to Clip Aura**: Rebranded all frontend pages, layouts, configuration comments, backend Swagger documents, custom ASS subtitle scripts, and video overlay watermarks.
+2. **Premium Stealth Logo Deployment**: Deployed a luxury, platinum-outlined dark-stealth monogram logo matching the high-end dark slate user interface.
+
 ## 🗓️ May 16, 2026
 
 ### ✅ Completed Actions
-1.  **Stripe Integration**: Fully wired the frontend to the backend Stripe Checkout flow.
-2.  **Monetization Logic**: Implemented a 15-minute free limit and mandatory watermarks for free users.
-3.  **Pro Tier**: Enabled automatic watermark removal and quota increase upon successful Stripe payment.
-4.  **Google OAuth**: Added UI and logic for "Continue with Google" login.
-5.  **Branching Strategy**: Established `main` (production) and `dev` (development) git branches.
-6.  **Professional Tooling**: Added smoke tests, a dev helper script (`dev.ps1`), and updated `.env.example`.
-7.  **Bug Fixes**: Resolved a critical syntax error in `script.js` that disabled all buttons.
+1.  **Next.js 14 Migration**: Transitioned from a static site to a high-performance App Router architecture.
+2.  **Stealth Mode Design**: Implemented a cinematic minimalism UI with bento grids and glassmorphism.
+3.  **Modern SaaS Branding**: Globally purged niche terminology (Intelligence/Neural) for standard industry language.
+4.  **Professional Dev Flow**: Added a `DEV_MODE` bypass to skip authentication and speed up local testing.
+5.  **Viral Engine 2.0**: Upgraded physics-based caption animations and brand-aligned highlighting.
+6.  **Supabase Auth Wiring**: Fully connected the frontend to the backend's secure authentication context.
 
 ### 🛠️ Current System Status
 *   **Backend**: Running in Docker (FastAPI + Celery + Redis).
-*   **Database**: SQLite (`opus_pro.db`) tracking users and jobs.
+*   **Database**: SQLite (`clip_aura.db`) tracking users and jobs.
 *   **Payments**: Connected to Stripe Test Mode.
 *   **Auth**: Connected to Supabase.
 

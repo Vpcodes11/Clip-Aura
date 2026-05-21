@@ -1,4 +1,4 @@
-# 🛠️ Opus Pro: Professional Developer Workflow
+# 🛠️ Clip Aura: Professional Developer Workflow
 
 This guide defines how we manage code to prevent accidental deletions, protect the production environment, and ensure high-quality releases.
 
@@ -37,7 +37,7 @@ Use meaningful commit messages so we can "travel back in time" if something brea
 1.  **Never push secrets**: Ensure `.env` is always in `.gitignore`.
 2.  **Test before merging**: Run `docker-compose up` and verify the UI before merging into `dev`.
 3.  **No `main` force-pushes**: Never overwrite the `main` history. It is our "Source of Truth."
-4.  **Database Backups**: Regularly copy `opus_pro.db` to a secure backup folder before running migrations.
+4.  **Database Backups**: Regularly copy `clip_aura.db` to a secure backup folder before running migrations.
 
 ---
 

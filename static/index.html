@@ -3,424 +3,241 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Opus Pro — AI Podcast to Viral Clips</title>
-    <meta name="description" content="Open-source AI-powered alternative to Opus Pro. Turn long podcasts into viral short-form clips with one click.">
+    <title>Clip Aura — Cinematic AI Video Clipping</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
+    <!-- Supabase JS -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <!-- Ambient Background Effects -->
-    <div class="ambient-bg">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="orb orb-3"></div>
-        <div class="grid-overlay"></div>
-    </div>
+    <div class="glow-mesh"></div>
 
-    <div class="app">
-        <!-- Navbar -->
-        <nav class="navbar" id="navbar">
-            <div class="nav-left">
-                <div class="logo">
-                    <div class="logo-mark">
-                        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                            <rect x="2" y="2" width="24" height="24" rx="6" fill="url(#logo-grad)" />
-                            <path d="M10 9L19 14L10 19V9Z" fill="white" />
-                            <defs>
-                                <linearGradient id="logo-grad" x1="2" y1="2" x2="26" y2="26">
-                                    <stop stop-color="#8B5CF6" />
-                                    <stop offset="1" stop-color="#EC4899" />
-                                </linearGradient>
-                            </defs>
-                        </svg>
-                    </div>
-                    <span class="logo-text">Opus Pro</span>
-                </div>
-            </div>
-            <div class="nav-right">
-                <span class="nav-badge">Open Source</span>
-                <span class="nav-badge" style="background: rgba(16,185,129,0.15); color: #10b981;">⚡ Groq Connected</span>
-                <div class="user-menu" id="user-menu">
-                    <button id="login-btn" class="btn-auth">Login</button>
-                    <div id="user-profile" class="user-profile hidden">
-                        <div class="user-stats">
-                            <span id="user-tier" class="tier-badge">Free</span>
-                            <span id="user-credits" class="credits-text">0/15 min</span>
-                        </div>
-                        <button id="logout-btn" class="btn-logout">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </nav>
-
-        <!-- Hero Section (visible on initial state) -->
-        <section id="hero-section" class="hero">
-            <div class="hero-badge">⚡ Powered by Whisper + LLaMA + FFmpeg</div>
-            <h1 class="hero-title">
-                Turn podcasts into
-                <span class="gradient-text">viral clips</span>
-            </h1>
-            <p class="hero-subtitle">
-                AI finds the most shareable moments from your long-form content and creates vertical clips with animated captions — completely free and open source.
-            </p>
-
-            <!-- Input Card -->
-            <div class="input-card" id="input-card">
-                <!-- Tabs: Upload vs URL -->
-                <div class="input-tabs">
-                    <button class="input-tab active" data-tab="upload" id="tab-upload">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                            <polyline points="17 8 12 3 7 8"/>
-                            <line x1="12" y1="3" x2="12" y2="15"/>
-                        </svg>
-                        Upload File
-                    </button>
-                    <button class="input-tab" data-tab="url" id="tab-url">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
-                            <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
-                        </svg>
-                        Paste URL
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-inner">
+            <a href="/" class="logo">
+                <img src="/static/logo.png" alt="O" style="width: 32px; height: 32px; border-radius: 8px;">
+                Clip Aura
+            </a>
+            
+            <div id="nav-actions">
+                <button id="login-btn" class="btn btn-primary">Sign In</button>
+                
+                <div id="user-profile" class="user-badge hidden">
+                    <span id="user-credits" style="font-size: 12px; font-weight: 600; color: var(--text-2);">0/0 min</span>
+                    <div id="user-tier" class="tier-tag">Free</div>
+                    <button id="logout-btn" class="btn-icon" title="Logout" style="background:none; border:none; color:var(--text-3); cursor:pointer;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                     </button>
                 </div>
+            </div>
+        </div>
+    </nav>
 
-                <!-- Upload Tab -->
-                <div class="tab-content active" id="content-upload">
-                    <div id="drop-zone" class="drop-zone">
-                        <div class="drop-zone-inner" id="drop-zone-inner">
-                            <div class="drop-icon-wrap">
-                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="drop-svg">
-                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                                    <polyline points="17 8 12 3 7 8"/>
-                                    <line x1="12" y1="3" x2="12" y2="15"/>
-                                </svg>
-                            </div>
-                            <p class="drop-title">Drop your video here</p>
-                            <p class="drop-sub">or click to browse • MP4, MKV, MOV, AVI, WebM</p>
-                        </div>
-                        <input type="file" id="file-input" accept="video/*" hidden>
-                    </div>
-                    <div id="file-info" class="file-info hidden">
-                        <div class="file-info-left">
-                            <div class="file-icon-wrap">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polygon points="23 7 16 12 23 17 23 7"/>
-                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-                                </svg>
-                            </div>
-                            <div class="file-meta">
-                                <span id="file-name" class="file-name"></span>
-                                <span id="file-size" class="file-size"></span>
-                            </div>
-                        </div>
-                        <button id="remove-file-btn" class="btn-icon-sm" title="Remove">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                            </svg>
-                        </button>
-                    </div>
+    <!-- Main Content -->
+    <main class="container">
+        <!-- Hero Section -->
+        <section id="hero-section" class="hero section">
+            <div class="hero-image-wrapper">
+                <img src="/static/hero.png" alt="Cinematic AI" class="hero-image">
+            </div>
+            <h1>Turn Podcasts into <br><span style="color: var(--primary);">Viral Clips</span></h1>
+            <p>Our AI analyzes your long-form content, finds the most engaging hooks, and reframes them for TikTok, Reels, and Shorts instantly.</p>
+
+            <div class="command-center">
+                <div class="command-tabs">
+                    <button class="command-tab input-tab active" data-tab="upload">Upload Video</button>
+                    <button class="command-tab input-tab" data-tab="url">Paste URL</button>
                 </div>
 
-                <!-- URL Tab -->
-                <div class="tab-content" id="content-url">
-                    <div class="url-input-wrap">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="url-icon">
-                            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                        </svg>
-                        <input type="text" id="url-input" placeholder="Paste YouTube, Twitch, or any video URL..." autocomplete="off">
+                <div class="command-content">
+                    <!-- Upload Tab -->
+                    <div id="content-upload" class="tab-content active">
+                        <div id="drop-zone" class="drop-zone">
+                            <input type="file" id="file-input" class="hidden" accept="video/*" style="display:none;">
+                            <div id="drop-zone-inner">
+                                <svg class="drop-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                                <h3>Drag & drop video</h3>
+                                <p style="font-size: 14px; margin-top: 8px;">Supports MP4, MOV, WEBM up to 2GB</p>
+                            </div>
+                            <div id="file-info" class="hidden">
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+                                    <div class="logo-icon" style="background: var(--success); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">✓</div>
+                                    <div style="text-align: left;">
+                                        <div id="file-name" style="font-weight: 700;">video.mp4</div>
+                                        <div id="file-size" style="font-size: 12px; color: var(--text-3);">0 MB</div>
+                                    </div>
+                                    <button id="remove-file-btn" class="btn btn-secondary" style="padding: 4px 12px; font-size: 12px;">Change</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <p class="url-hint">Supports YouTube, Twitch, Vimeo, X/Twitter, and 1000+ sites via yt-dlp</p>
-                </div>
 
-                <!-- Settings Row -->
-                <div class="settings-row">
-                    <div class="setting-group">
-                        <label class="setting-label">Format</label>
-                        <div class="setting-select-wrap">
+                    <!-- URL Tab -->
+                    <div id="content-url" class="tab-content hidden">
+                        <div class="url-input-wrapper">
+                            <input type="text" id="url-input" class="url-input" style="width:100%;" placeholder="Paste YouTube, Vimeo, or direct video link...">
+                        </div>
+                    </div>
+
+                    <!-- Global Settings -->
+                    <div class="settings-bar">
+                        <div class="setting-item">
+                            <label class="setting-label">FRAME PRESET</label>
                             <select id="preset-select" class="setting-select">
-                                <option value="tiktok" selected>9:16 TikTok</option>
-                                <option value="youtube_shorts">9:16 Shorts</option>
-                                <option value="square">1:1 Square</option>
-                                <option value="landscape">16:9 Landscape</option>
+                                <option value="tiktok">9:16 Portrait (TikTok/Reels)</option>
+                                <option value="landscape">16:9 Original (YouTube)</option>
+                                <option value="square">1:1 Square (Instagram)</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="setting-group">
-                        <label class="setting-label">Captions</label>
-                        <div class="setting-select-wrap">
+                        <div class="setting-item">
+                            <label class="setting-label">CAPTION STYLE</label>
                             <select id="caption-select" class="setting-select">
-                                <option value="typography_motion" selected>Cursive + CAPS (Typography)</option>
-                                <option value="viral">Viral (The Bold Font)</option>
-                                <option value="bold_impact">Bold Impact (Montserrat)</option>
-                                <option value="neon_pulse">Neon Pulse (Modern)</option>
-                                <option value="karaoke">Karaoke Pop (Fun)</option>
-                                <option value="tiktok">TikTok Classic</option>
-                                <option value="minimal">Minimalist</option>
+                                <option value="typography_motion">Cursive + CAPS (Alex Hormozi)</option>
+                                <option value="modern_bold">Modern Bold (MrBeast)</option>
+                                <option value="minimal">Minimal White</option>
                             </select>
                         </div>
                     </div>
-                </div>
 
-
-
-                <!-- Start Button -->
-                <button id="start-btn" class="btn-primary" disabled>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="5 3 19 12 5 21 5 3"/>
-                    </svg>
-                    <span>Extract Viral Clips</span>
-                </button>
-            </div>
-
-            <!-- Features -->
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">🎯</div>
-                    <h3>AI Clip Detection</h3>
-                    <p>LLaMA 70B finds the most viral-worthy moments automatically</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">✨</div>
-                    <h3>Animated Captions</h3>
-                    <p>Word-by-word karaoke-style captions that pop</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">📐</div>
-                    <h3>Multi-Format</h3>
-                    <p>Export to TikTok 9:16, Square 1:1, or Landscape 16:9</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon">🆓</div>
-                    <h3>100% Free</h3>
-                    <p>Open source with Groq's free API — no subscription needed</p>
+                    <div style="margin-top: 32px;">
+                        <button id="start-btn" class="btn btn-primary btn-block" style="width: 100%; justify-content: center; height: 56px; font-size: 16px;" disabled>
+                            Generate Viral Clips
+                        </button>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- Processing Section -->
-        <section id="processing-section" class="processing-section hidden">
-            <div class="processing-card">
-                <div class="processing-header">
-                    <div class="processing-anim">
-                        <div class="proc-ring"></div>
-                        <div class="proc-ring proc-ring-2"></div>
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="proc-icon">
-                            <polygon points="5 3 19 12 5 21 5 3"/>
+        <!-- Processing View -->
+        <section id="processing-section" class="section hidden">
+            <div class="processing-container">
+                <div class="ai-pulse">
+                    <div class="pulse-circle"></div>
+                    <div class="pulse-inner">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
+                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
                         </svg>
                     </div>
-                    <div>
-                        <h2 class="processing-title">Processing your video</h2>
-                        <p id="processing-source" class="processing-source"></p>
-                    </div>
                 </div>
-
-                <!-- Progress Bar -->
-                <div class="progress-wrap">
-                    <div class="progress-bar">
+                <h2 id="progress-message">Analyzing your video...</h2>
+                <div style="max-width: 500px; margin: 32px auto;">
+                    <div class="progress-track">
                         <div id="progress-fill" class="progress-fill"></div>
                     </div>
-                    <div class="progress-meta">
-                        <span id="progress-message" class="progress-msg">Initializing...</span>
-                        <span id="progress-percent" class="progress-pct">0%</span>
+                    <div style="display: flex; justify-content: space-between; font-size: 14px; color: var(--text-3);">
+                        <span id="processing-source">source.mp4</span>
+                        <span id="progress-percent">0%</span>
                     </div>
                 </div>
 
                 <!-- Pipeline Steps -->
-                <div class="pipeline">
-                    <div class="pipe-step" id="step-download">
-                        <div class="pipe-dot"></div>
-                        <div class="pipe-info">
-                            <span class="pipe-label">Download</span>
-                            <span class="pipe-desc">Fetch video from URL</span>
-                        </div>
-                    </div>
-                    <div class="pipe-line"></div>
-                    <div class="pipe-step" id="step-extract">
-                        <div class="pipe-dot"></div>
-                        <div class="pipe-info">
-                            <span class="pipe-label">Extract Audio</span>
-                            <span class="pipe-desc">Separate audio track</span>
-                        </div>
-                    </div>
-                    <div class="pipe-line"></div>
-                    <div class="pipe-step" id="step-transcribe">
-                        <div class="pipe-dot"></div>
-                        <div class="pipe-info">
-                            <span class="pipe-label">Transcribe</span>
-                            <span class="pipe-desc">Whisper AI speech-to-text</span>
-                        </div>
-                    </div>
-                    <div class="pipe-line"></div>
-                    <div class="pipe-step" id="step-analyze">
-                        <div class="pipe-dot"></div>
-                        <div class="pipe-info">
-                            <span class="pipe-label">Find Moments</span>
-                            <span class="pipe-desc">LLaMA AI viral detection</span>
-                        </div>
-                    </div>
-                    <div class="pipe-line"></div>
-                    <div class="pipe-step" id="step-render">
-                        <div class="pipe-dot"></div>
-                        <div class="pipe-info">
-                            <span class="pipe-label">Render Clips</span>
-                            <span class="pipe-desc">FFmpeg video processing</span>
-                        </div>
-                    </div>
+                <div id="pipeline-steps" style="display: flex; justify-content: center; gap: 40px; margin-top: 40px;">
+                    <div id="step-download" class="step-item">Download</div>
+                    <div id="step-transcribe" class="step-item">Transcribe</div>
+                    <div id="step-analyze" class="step-item">AI Analysis</div>
+                    <div id="step-render" class="step-item">Rendering</div>
                 </div>
-            </div>
-
-            <!-- Live Transcript Preview -->
-            <div id="transcript-preview" class="transcript-card hidden">
-                <div class="transcript-header">
-                    <h3>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/>
-                            <line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
-                        </svg>
-                        Transcript
-                    </h3>
-                    <span id="transcript-stats" class="transcript-stats"></span>
-                </div>
-                <div id="transcript-body" class="transcript-body"></div>
             </div>
         </section>
 
-        <!-- Results Section -->
-        <section id="results-section" class="results-section hidden">
+        <!-- Results View -->
+        <section id="results-section" class="section hidden">
             <div class="results-header">
                 <div>
-                    <h2 class="results-title">
-                        <span class="gradient-text">Your Viral Clips</span>
-                    </h2>
-                    <p id="results-summary" class="results-summary"></p>
+                    <h2 style="font-size: 32px;">Generated Clips</h2>
+                    <p id="results-summary" style="color: var(--text-2);">Successfully extracted viral moments.</p>
                 </div>
-                <div class="results-actions">
-                    <button id="download-all-btn" class="btn-secondary">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                            <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                        </svg>
-                        Download All
-                    </button>
-                    <button id="new-project-btn" class="btn-ghost">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                        </svg>
-                        New Project
-                    </button>
+                <div style="display: flex; gap: 12px;">
+                    <button id="download-all-btn" class="btn btn-secondary">Download All</button>
+                    <button id="new-project-btn" class="btn btn-primary">New Project</button>
                 </div>
             </div>
 
-            <div id="clips-grid" class="clips-grid"></div>
-
-            <!-- Transcript Section (full) -->
-            <div id="full-transcript" class="transcript-card full-transcript hidden">
-                <div class="transcript-header">
-                    <h3>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/>
-                        </svg>
-                        Full Transcript
-                    </h3>
-                    <button id="toggle-transcript-btn" class="btn-icon-sm">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="6 9 12 15 18 9"/>
-                        </svg>
-                    </button>
-                </div>
-                <div id="full-transcript-body" class="transcript-body collapsed"></div>
+            <div id="clips-grid" class="clips-grid">
+                <!-- Clips injected here -->
             </div>
         </section>
 
-        <!-- Error Section -->
-        <section id="error-section" class="error-section hidden">
-            <div class="error-card">
-                <div class="error-icon">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/>
-                        <line x1="9" y1="9" x2="15" y2="15"/>
-                    </svg>
-                </div>
-                <h2>Something went wrong</h2>
-                <p id="error-message" class="error-msg"></p>
-                <button id="retry-btn" class="btn-primary">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
-                    </svg>
-                    <span>Try Again</span>
-                </button>
-            </div>
+        <!-- Error View -->
+        <section id="error-section" class="section hidden" style="text-align: center;">
+            <div class="logo-icon" style="background: var(--error); margin: 0 auto 24px; width: 64px; height: 64px; font-size: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">!</div>
+            <h2 style="margin-bottom: 12px;">Something went wrong</h2>
+            <p id="error-message" style="color: var(--text-2); margin-bottom: 32px;">Failed to process video.</p>
+            <button id="retry-btn" class="btn btn-primary">Try Again</button>
         </section>
+    </main>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2 id="auth-title" style="margin-bottom: 8px;">Welcome to Clip Aura</h2>
+            <p style="color: var(--text-2); font-size: 14px; margin-bottom: 32px;">The elite tool for viral video creation.</p>
+            
+            <form id="auth-form" class="auth-form">
+                <div style="margin-bottom: 20px;">
+                    <label class="setting-label">EMAIL ADDRESS</label>
+                    <input type="email" id="auth-email" class="url-input" style="width:100%;" placeholder="you@example.com" required>
+                </div>
+                <div style="margin-bottom: 32px;">
+                    <label class="setting-label">PASSWORD</label>
+                    <input type="password" id="auth-password" class="url-input" style="width:100%;" placeholder="••••••••" required>
+                </div>
+                <button type="submit" id="auth-submit" class="btn btn-primary" style="width: 100%; justify-content: center; height: 48px;">Continue</button>
+            </form>
+
+            <div class="auth-divider"><span>OR</span></div>
+            
+            <button id="google-auth-btn" class="btn btn-secondary" style="width: 100%; justify-content: center; height: 48px; gap: 12px;">
+                <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                Continue with Google
+            </button>
+
+            <div style="margin-top: 32px; text-align: center; font-size: 14px; color: var(--text-3);">
+                <span id="auth-toggle-text">Don't have an account? <a href="#" id="auth-toggle" style="color: var(--primary);">Sign Up</a></span>
+            </div>
+            
+            <button id="close-auth" class="modal-close" style="position: absolute; top: 20px; right: 20px; color: var(--text-3); background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+        </div>
     </div>
 
     <!-- Pricing Modal -->
     <div id="pricing-modal" class="modal hidden">
-        <div class="modal-content pricing-card">
-            <span class="close-modal">&times;</span>
-            <div class="pricing-header">
-                <h2>Upgrade to Pro 🚀</h2>
-                <p>Unlock high-performance AI clipping and 200 mins/mo.</p>
-            </div>
-            <div class="pricing-body">
-                <ul class="features-list">
-                    <li>✅ 200 Minutes of Video / month</li>
-                    <li>✅ Priority GPU Processing (v3.0 ready)</li>
-                    <li>✅ Advanced Typography Motion Captions</li>
-                    <li>✅ Custom Branding & No Watermark</li>
-                    <li>✅ 4K Export Support</li>
-                </ul>
-                <div class="price-tag">
-                    <span class="amount">$29</span>
-                    <span class="period">/month</span>
+        <div class="modal-content" style="max-width: 600px;">
+            <h2 style="text-align: center; margin-bottom: 8px;">Upgrade to Pro</h2>
+            <p style="text-align: center; color: var(--text-2); font-size: 14px; margin-bottom: 40px;">Get unlimited access and premium features.</p>
+            
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <div style="font-size: 12px; font-weight: 800; color: var(--text-3); margin-bottom: 8px;">FREE TIER</div>
+                    <div style="font-size: 32px; font-weight: 800;">₹0<span style="font-size: 14px; color: var(--text-3);">/mo</span></div>
+                    <ul style="list-style: none; text-align: left; margin: 24px 0; font-size: 14px; color: var(--text-2);">
+                        <li style="margin-bottom: 8px;">✓ 15 mins/month</li>
+                        <li style="margin-bottom: 8px;">✕ Mandatory Watermark</li>
+                        <li style="margin-bottom: 8px;">✕ Low priority queue</li>
+                    </ul>
+                    <button class="btn btn-secondary btn-block" style="width: 100%; justify-content: center;" onclick="hidePricingModal()">Current Plan</button>
                 </div>
-                <button id="checkout-btn" class="btn btn-primary btn-block">Start 7-Day Free Trial</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Auth Modal -->
-    <div id="auth-modal" class="modal hidden">
-        <div class="modal-content auth-card">
-            <button class="modal-close" id="close-auth">&times;</button>
-            <div class="auth-header">
-                <h2 id="auth-title">Welcome to Opus Pro</h2>
-                <p id="auth-subtitle">Sign in to start creating viral clips</p>
-            </div>
-            <form id="auth-form" class="auth-form">
-                <div class="input-group">
-                    <label>Email Address</label>
-                    <input type="email" id="auth-email" placeholder="name@example.com" required>
+                
+                <div class="pricing-card popular">
+                    <div class="popular-tag">MOST POPULAR</div>
+                    <div style="font-size: 12px; font-weight: 800; color: var(--primary); margin-bottom: 8px;">CREATOR PRO</div>
+                    <div style="font-size: 32px; font-weight: 800;">₹2,499<span style="font-size: 14px; color: var(--text-3);">/mo</span></div>
+                    <ul style="list-style: none; text-align: left; margin: 24px 0; font-size: 14px; color: var(--text-2);">
+                        <li style="margin-bottom: 8px;">✓ 200 mins/month</li>
+                        <li style="margin-bottom: 8px;">✓ **No Watermark**</li>
+                        <li style="margin-bottom: 8px;">✓ GPU Priority Queue</li>
+                        <li style="margin-bottom: 8px;">✓ 4K Exports</li>
+                    </ul>
+                    <button id="checkout-btn" class="btn btn-primary btn-block" style="width: 100%; justify-content: center; background: linear-gradient(135deg, var(--primary), var(--accent)); color: white;">Upgrade Now</button>
                 </div>
-                <div class="input-group">
-                    <label>Password</label>
-                    <input type="password" id="auth-password" placeholder="••••••••" required>
-                </div>
-                <button type="submit" id="auth-submit" class="btn-primary">Continue</button>
-            </form>
-            <div class="auth-divider">
-                <span>OR</span>
             </div>
-            <button id="google-auth-btn" class="btn-secondary btn-google">
-                <svg width="18" height="18" viewBox="0 0 24 24">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                </svg>
-                Continue with Google
-            </button>
-            <div class="auth-footer">
-                <p id="auth-toggle-text">Don't have an account? <a href="#" id="auth-toggle">Sign Up</a></p>
-            </div>
+            
+            <button class="close-modal" style="position: absolute; top: 20px; right: 20px; color: var(--text-3); background:none; border:none; font-size:20px; cursor:pointer;" onclick="hidePricingModal()">✕</button>
         </div>
     </div>
 

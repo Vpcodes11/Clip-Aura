@@ -3,10 +3,10 @@ from celery import Celery
 from app.config import REDIS_URL
 
 celery_app = Celery(
-    "opus_pro",
+    "clip_aura",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["tasks"]
+    include=["app.worker.tasks"]
 )
 
 celery_app.conf.update(

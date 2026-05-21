@@ -1,7 +1,7 @@
-# Opus Pro Development Helper Script
+# Clip Aura Development Helper Script
 
 function Show-Help {
-    Write-Host "Opus Pro Dev Tools" -ForegroundColor Cyan
+    Write-Host "Clip Aura Dev Tools" -ForegroundColor Cyan
     Write-Host "-------------------"
     Write-Host "run      : Start the full stack (Docker)"
     Write-Host "stop     : Stop the stack"

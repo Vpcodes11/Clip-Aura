@@ -41,24 +41,12 @@ def extract_audio(video_path, audio_path):
         raise RuntimeError(f"Audio extraction failed: {result.stderr[-300:]}")
 
 
-def get_audio_duration(audio_path):
-    """Get audio duration in seconds using ffprobe"""
+def get_media_duration(path):
+    """Get audio or video duration in seconds using ffprobe"""
     cmd = [
         'ffprobe', '-v', 'quiet',
         '-show_entries', 'format=duration',
-        '-of', 'json', audio_path
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    data = json.loads(result.stdout)
-    return float(data['format']['duration'])
-
-
-def get_video_duration(video_path):
-    """Get video duration in seconds using ffprobe"""
-    cmd = [
-        'ffprobe', '-v', 'quiet',
-        '-show_entries', 'format=duration',
-        '-of', 'json', video_path
+        '-of', 'json', path
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
     data = json.loads(result.stdout)
@@ -67,7 +55,7 @@ def get_video_duration(video_path):
 
 def split_audio(audio_path, chunk_dir, chunk_duration=AUDIO_CHUNK_DURATION):
     """Split audio into chunks to stay under API file size limit"""
-    duration = get_audio_duration(audio_path)
+    duration = get_media_duration(audio_path)
     chunks = []
     start = 0
     i = 0
@@ -138,14 +126,8 @@ def _transcribe_file(client, config, file_path):
     return words, segments
 
 
-def transcribe(video_path, api_key, progress_callback=None, provider='groq'):
-    """
-    Full transcription pipeline:
-    1. Extract audio from video
-    2. Split if needed (>24MB)
-    3. Transcribe via Whisper API with word-level timestamps
-    4. Merge results
-    """
+def _run_transcribe(video_path, api_key, progress_callback=None, provider='groq'):
+    """Helper to run the transcription steps"""
     client, config = get_client(api_key, provider)
 
     # Setup work directory
@@ -203,7 +185,7 @@ def transcribe(video_path, api_key, progress_callback=None, provider='groq'):
 
     # Get video duration
     try:
-        duration = get_video_duration(video_path)
+        duration = get_media_duration(video_path)
     except Exception:
         duration = all_segments[-1]['end'] if all_segments else 0
 
@@ -215,3 +197,33 @@ def transcribe(video_path, api_key, progress_callback=None, provider='groq'):
         'full_text': full_text,
         'duration': duration
     }
+
+
+def transcribe(video_path, api_key, progress_callback=None, provider='groq'):
+    """
+    Full transcription pipeline with OpenAI fallback on rate limits:
+    1. Extract audio from video
+    2. Split if needed (>24MB)
+    3. Transcribe via Whisper API with word-level timestamps
+    4. Merge results
+    """
+    try:
+        return _run_transcribe(video_path, api_key, progress_callback, provider)
+    except Exception as e:
+        err_msg = str(e).lower()
+        if provider == 'groq' and ("rate_limit" in err_msg or "429" in err_msg or "rate limit" in err_msg):
+            from app.config import OPENAI_API_KEY
+            if OPENAI_API_KEY:
+                if progress_callback:
+                    progress_callback("Groq Whisper rate limit hit. Falling back to OpenAI Whisper...", 12)
+                print("[Transcriber] Groq rate limit hit. Falling back to OpenAI Whisper...")
+                try:
+                    return _run_transcribe(video_path, OPENAI_API_KEY, progress_callback, provider='openai')
+                except Exception as openai_err:
+                    raise RuntimeError(f"Transcription failed: Groq rate limit exceeded and OpenAI fallback also failed: {openai_err}")
+            else:
+                raise RuntimeError(
+                    f"Groq Whisper rate limit exceeded. Please wait a few minutes, or set "
+                    f"OPENAI_API_KEY in your .env file to enable automatic fallback. Details: {e}"
+                )
+        raise e

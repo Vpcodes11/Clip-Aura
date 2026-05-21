@@ -14,28 +14,37 @@ services:
       - ./uploads:/app/uploads
       - ./output:/app/output
       - ./temp:/app/temp
-      - ./opus_pro.db:/app/opus_pro.db
+      - ./clip_aura.db:/app/clip_aura.db
     env_file:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
     depends_on:
       - redis
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
     restart: unless-stopped
 
   worker:
     build: .
-    command: celery -A app.worker.tasks worker --loglevel=info
+    command: celery -A app.worker.celery_app worker --loglevel=info
     volumes:
       - .:/app
       - ./uploads:/app/uploads
       - ./output:/app/output
       - ./temp:/app/temp
-      - ./opus_pro.db:/app/opus_pro.db
+      - ./clip_aura.db:/app/clip_aura.db
     env_file:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - redis
+      web:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped

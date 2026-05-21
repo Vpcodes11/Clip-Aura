@@ -1,4 +1,4 @@
-# 🚀 Opus Pro: SaaS Scaling & Development Strategy
+# 🚀 Clip Aura: SaaS Scaling & Development Strategy
 
 This document outlines the master plan to transform the current local prototype into a professional, commercial-grade AI video clipping service.
 
@@ -12,7 +12,7 @@ Most clipping tools (like the original Opus Clip) rely on expensive OpenAI infra
 
 ---
 
-## 2. Core Feature Roadmap (The "Opus Pro" Level)
+## 2. Core Feature Roadmap (The "Clip Aura" Level)
 
 ### A. AI Auto-Reframing (Dynamic Speaker Tracking) 🔴 *Critical*
 *   **Goal**: The "camera" must follow the face of the person speaking.

@@ -33,7 +33,7 @@ def test_docs_page():
         return False
 
 if __name__ == "__main__":
-    print("🚀 Starting Opus Pro Smoke Test...")
+    print("🚀 Starting Clip Aura Smoke Test...")
     results = [
         test_api_health(),
         test_docs_page()

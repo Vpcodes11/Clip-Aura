@@ -3,7 +3,7 @@ import subprocess
 import os
 import json
 import functools
-from app.config import TARGET_WIDTH, TARGET_HEIGHT, CAPTION_STYLES, DEFAULT_CAPTION_STYLE, PRESETS
+from app.config import CAPTION_STYLES, DEFAULT_CAPTION_STYLE, PRESETS
 from app.core.face_processor import tracker
 
 
@@ -93,7 +93,7 @@ def generate_ass_subtitles(words, clip_start, clip_end, output_path, caption_sty
     bold_flag = -1 if style['bold'] else 0
 
     ass_content = f"""[Script Info]
-Title: Opus Pro Captions
+Title: Clip Aura Captions
 ScriptType: v4.00+
 PlayResX: {tw}
 PlayResY: {th}
@@ -172,7 +172,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 karaoke_parts.append(part)
 
             text = "".join(karaoke_parts).strip()
-            animation = f"{{\\an{style['alignment']}\\fad(50,50)\\t(0,100,\\fscx115\\fscy115)\\t(100,200,\\fscx100\\fscy100)}}"
+            # Professional Bouncy Animation: Pop in, slight overshoot, then settle
+            animation = f"{{\\an{style['alignment']}\\fad(50,50)\\t(0,80,\\fscx120\\fscy120)\\t(80,160,\\fscx100\\fscy100)}}"
             ass_content += f"Dialogue: 0,{start_ts},{end_ts},Default,,0,0,0,,{animation}{text}\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:
@@ -227,7 +228,7 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
         # Dynamic Crop + Blur Background
         filter_complex = (
             f"[0:v]crop={cw}:{ch}:{first_x}:0,scale={tw}:{th}[vid];"
-            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Opus Pro':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
+            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Clip Aura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
         )
     elif preset in ("tiktok", "youtube_shorts") and src_w > src_h:
         # Standard Landscape-on-Blur if tracking fails
@@ -236,14 +237,14 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
             f"crop={tw}:{th},boxblur=25:5[bg];"
             f"[0:v]scale={tw}:-2[fg];"
             f"[bg][fg]overlay=(W-w)/2:(H-h)/2[vid];"
-            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Opus Pro':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
+            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Clip Aura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
         )
     else:
         # Standard fit
         filter_complex = (
             f"[0:v]scale={tw}:{th}:force_original_aspect_ratio=decrease,"
             f"pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2:black[vid];"
-            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Opus Pro':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
+            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Clip Aura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
         )
 
     cmd = [
@@ -255,11 +256,11 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
         '-map', '[out]',
         '-map', '0:a?',
         '-c:v', 'libx264',
-        '-preset', 'ultrafast',
-        '-crf', '22',
+        '-preset', 'superfast',
+        '-crf', '20',
         '-pix_fmt', 'yuv420p',
         '-c:a', 'aac',
-        '-b:a', '128k',
+        '-b:a', '160k',
         '-y',
         output_path
     ]
@@ -269,3 +270,28 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
         raise RuntimeError(f"FFmpeg failed: {result.stderr[-500:]}")
 
     return output_path
+
+
+def safe_create_clip(video_path, clip_info, words, output_path, clip_index,
+                     progress_callback=None, caption_style=None, preset="tiktok", is_pro=False):
+    """
+    Fault-tolerant wrapper around create_clip.
+    Returns a result dict: {"ok": True, "attempt": "dynamic"} on success,
+    or {"ok": False, "error": str} on failure — so the worker can continue
+    rendering remaining clips even if one fails.
+    """
+    try:
+        create_clip(
+            video_path=video_path,
+            clip_info=clip_info,
+            words=words,
+            output_path=output_path,
+            clip_index=clip_index,
+            progress_callback=progress_callback,
+            caption_style=caption_style,
+            preset=preset,
+            is_pro=is_pro,
+        )
+        return {"ok": True, "attempt": "dynamic"}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}

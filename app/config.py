@@ -23,8 +23,6 @@ PRESETS = {
 }
 
 DEFAULT_PRESET = "landscape"
-TARGET_WIDTH = 1920
-TARGET_HEIGHT = 1080  # 16:9 horizontal
 
 # Clip settings
 MIN_CLIP_DURATION = 5   # seconds
@@ -64,7 +62,7 @@ CAPTION_STYLES = {
         "margin_v": 120,
     },
     "viral": {
-        "font": "Montserrat Black", # Opus Pro favorite
+        "font": "Montserrat Black", # Clip Aura favorite
         "fontsize": 110,
         "primary_color": "&H0000D4FF", # Active: Gold
         "highlight_color": "&H00FFFFFF", # Inactive: White
@@ -167,23 +165,88 @@ CAPTION_STYLES = {
         "shadow": 0,
         "alignment": 2,
         "margin_v": 80, # Optimized bottom position (Below the video)
-    }
+    },
+    "stealth_pro": {
+        "font": "Outfit", 
+        "fontsize": 95,
+        "primary_color": "&H00FFFFFF",
+        "highlight_color": "&H00F65C8B", # Vibrant Purple (Brand Accent)
+        "outline_color": "&H00000000",
+        "back_color": "&H40000000",
+        "bold": True,
+        "outline": 8,
+        "shadow": 12,
+        "alignment": 2,
+        "margin_v": 120,
+    },
+    "hormozi": {
+        # Alex Hormozi style: high-contrast yellow/white alternating, power pops
+        "font": "Montserrat Black",
+        "fontsize": 105,
+        "primary_color": "&H0000FFFF",    # Yellow (inactive word)
+        "highlight_color": "&H00FFFFFF",  # White (active/karaoke word)
+        "outline_color": "&H00000000",
+        "back_color": "&H00000000",
+        "bold": True,
+        "outline": 8,
+        "shadow": 6,
+        "alignment": 2,
+        "margin_v": 120,
+    },
+    "ali_abdaal": {
+        # Ali Abdaal style: clean, minimal, educational — centered on semi-transparent panel
+        "font": "Inter",
+        "fontsize": 72,
+        "primary_color": "&H00FFFFFF",    # White active
+        "highlight_color": "&H00CCCCCC",  # Light grey inactive
+        "outline_color": "&H00000000",
+        "back_color": "&H99000000",        # Semi-transparent dark box
+        "bold": True,
+        "outline": 0,
+        "shadow": 0,
+        "alignment": 5,                    # Center-aligned
+        "margin_v": 200,
+    },
+    "beast_mode": {
+        # MrBeast style: giant, bold, aggressive, max energy
+        "font": "Montserrat Black",
+        "fontsize": 130,
+        "primary_color": "&H000000FF",    # Red active
+        "highlight_color": "&H00FFFFFF",  # White inactive
+        "outline_color": "&H00000000",
+        "back_color": "&H00000000",
+        "bold": True,
+        "outline": 14,
+        "shadow": 0,
+        "alignment": 2,
+        "margin_v": 80,
+    },
 }
 
 # Power words for automatic capitalization and highlighting
 POWER_WORDS = [
-    "amazing", "secret", "never", "always", "money", "growth", "viral", "hacks", "life", "change", "fast", "easy", 
+    "amazing", "secret", "never", "always", "money", "growth", "viral", "hacks", "life", "change", "fast", "easy",
     "simple", "power", "win", "lose", "stop", "start", "now", "today", "tomorrow", "don't", "can't", "must",
     "truth", "lies", "billion", "million", "rich", "poor", "success", "failure", "everything", "nothing",
     "insane", "crazy", "huge", "shocking", "exposed", "dangerous", "illegal", "hidden", "private", "dark",
-    "light", "heaven", "hell", "god", "devil", "love", "hate", "fear", "brave", "strong", "weak", "power",
-    "wealth", "freedom", "prison", "breakout", "system", "matrix", "wake", "sleep", "dream", "real"
+    "light", "heaven", "hell", "god", "devil", "love", "hate", "fear", "brave", "strong", "weak",
+    "wealth", "freedom", "prison", "breakout", "system", "matrix", "wake", "sleep", "dream", "real",
+    "unlocked", "revealed", "leaked", "danger", "warning", "billionaire", "passive", "income", "quit",
+    "boss", "fired", "empire", "legend", "warrior", "elite", "stealth", "intelligence", "neural",
 ]
 
 DEFAULT_CAPTION_STYLE = "typography_motion"
 
+# Dev mode bypass — single source of truth for all modules
+DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
+
 # API Keys (stored in .env file, never committed to git)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    print("CRITICAL WARNING: GROQ_API_KEY is not set in .env. AI Transcription will fail.")
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 DEFAULT_PROVIDER = "groq"
 
 # Cloud Storage (S3 / R2)
@@ -201,3 +264,6 @@ REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379/0')
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
 STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET')
 STRIPE_PRO_PRICE_ID = os.getenv('STRIPE_PRO_PRICE_ID')
+
+# B-Roll (Pexels API — optional, leave blank to disable)
+PEXELS_API_KEY = os.getenv('PEXELS_API_KEY', '')
