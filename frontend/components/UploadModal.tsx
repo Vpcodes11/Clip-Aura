@@ -26,7 +26,6 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
   const [enableHookOpt, setEnableHookOpt] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [step, setStep] = useState(1);
 
   // Dynamic configurations fetched from API
   const [presetsList, setPresetsList] = useState<Record<string, any>>({
@@ -77,7 +76,6 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
       setUrl('');
       setError(null);
       setShowAdvanced(false);
-      setStep(1);
     }
   }, [isOpen]);
 
@@ -169,8 +167,6 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
     setError(null);
   };
 
-  const isNextDisabled = activeTab === 'upload' ? !file : !url.trim();
-
   return (
     <AnimatePresence>
       {isOpen && (
@@ -187,175 +183,161 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
                 <Sparkles size={18} className="text-accent" />
                 <h2>Generate Shorts</h2>
               </div>
-              <div className="step-indicator-bar">
-                <div className={`step-dot ${step === 1 ? 'active' : ''}`}>1</div>
-                <div className="step-line"></div>
-                <div className={`step-dot ${step === 2 ? 'active' : ''}`}>2</div>
-              </div>
               <button onClick={onClose} className="close-btn" disabled={isUploading}><X size={20} /></button>
             </div>
 
-            {step === 1 ? (
-              <>
-                <div className="modal-tabs">
-                  <button 
-                    className={`modal-tab ${activeTab === 'upload' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('upload')}
-                    disabled={isUploading}
-                  >
-                    <Upload size={16} /> Upload Video
-                  </button>
-                  <button 
-                    className={`modal-tab ${activeTab === 'url' ? 'active' : ''}`}
-                    onClick={() => handleTabChange('url')}
-                    disabled={isUploading}
-                  >
-                    <LinkIcon size={16} /> Paste URL
-                  </button>
-                </div>
+            <div className="modal-tabs">
+              <button 
+                className={`modal-tab ${activeTab === 'upload' ? 'active' : ''}`}
+                onClick={() => handleTabChange('upload')}
+                disabled={isUploading}
+              >
+                <Upload size={16} /> Upload Video
+              </button>
+              <button 
+                className={`modal-tab ${activeTab === 'url' ? 'active' : ''}`}
+                onClick={() => handleTabChange('url')}
+                disabled={isUploading}
+              >
+                <LinkIcon size={16} /> Paste URL
+              </button>
+            </div>
 
-                <div className="modal-body">
-                  {activeTab === 'upload' ? (
-                    <div 
-                      className={`drop-zone ${isDragActive ? 'active' : ''} ${file ? 'has-file' : ''}`}
-                      onClick={() => !isUploading && fileInputRef.current?.click()}
-                      onDragOver={(event) => {
-                        event.preventDefault();
-                        if (!isUploading) setIsDragActive(true);
-                      }}
-                      onDragLeave={() => setIsDragActive(false)}
-                      onDrop={(event) => {
-                        event.preventDefault();
-                        setIsDragActive(false);
-                        if (!isUploading) handleFiles(event.dataTransfer.files?.[0]);
-                      }}
-                    >
-                      <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        className="hidden" 
-                        onChange={(e) => handleFiles(e.target.files?.[0])}
-                        style={{ display: 'none' }}
-                        disabled={isUploading}
-                      />
-                      {file ? (
-                        <div className="file-selected">
-                          <div className="selected-icon"><CheckCircle2 size={22} /></div>
-                          <span>{file.name}</span>
-                          <small>{(file.size / (1024 * 1024)).toFixed(1)} MB ready</small>
-                        </div>
-                      ) : (
-                        <>
-                          <Upload size={32} className="text-muted" />
-                          <p>Drop a video here or tap to browse</p>
-                          <span className="text-muted text-xs">MP4, MOV, or WEBM up to 2 GB</span>
-                        </>
-                      )}
+            <div className="modal-body">
+              {activeTab === 'upload' ? (
+                <div 
+                  className={`drop-zone ${isDragActive ? 'active' : ''} ${file ? 'has-file' : ''}`}
+                  onClick={() => !isUploading && fileInputRef.current?.click()}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    if (!isUploading) setIsDragActive(true);
+                  }}
+                  onDragLeave={() => setIsDragActive(false)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setIsDragActive(false);
+                    if (!isUploading) handleFiles(event.dataTransfer.files?.[0]);
+                  }}
+                >
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    onChange={(e) => handleFiles(e.target.files?.[0])}
+                    style={{ display: 'none' }}
+                    disabled={isUploading}
+                  />
+                  {file ? (
+                    <div className="file-selected">
+                      <div className="selected-icon"><CheckCircle2 size={22} /></div>
+                      <span>{file.name}</span>
+                      <small>{(file.size / (1024 * 1024)).toFixed(1)} MB ready</small>
                     </div>
                   ) : (
-                    <div className="url-input-box">
-                      <input 
-                        type="text" 
-                        placeholder="https://youtube.com/watch?v=..." 
-                        value={url}
-                        onChange={(e) => {
-                          setUrl(e.target.value);
-                          setError(null);
-                        }}
-                        className="stealth-input"
-                        disabled={isUploading}
-                      />
-                      <small className="text-muted text-xs block mt-2 px-1">Paste a YouTube link or direct video URL.</small>
-                    </div>
+                    <>
+                      <Upload size={32} className="text-muted" />
+                      <p>Drop your video here or click to browse</p>
+                      <span className="text-muted text-xs">MP4, MOV, WEBM — up to 2GB</span>
+                    </>
                   )}
                 </div>
-              </>
-            ) : (
-              <div className="modal-body presets-section">
-                <h3 className="section-title">Select Video Layout</h3>
-                
-                {/* Preset layout grids */}
-                <div className="presets-grid">
-                  {Object.entries(presetsList).map(([key, value]) => {
-                    const isSelected = selectedPreset === key;
-                    const label = value.label || key;
-                    let aspectIcon = <Smartphone size={16} />;
-                    if (key === 'landscape') aspectIcon = <Monitor size={16} />;
-                    if (key === 'square') aspectIcon = <SquareIcon size={16} />;
-
-                    return (
-                      <div 
-                        key={key} 
-                        className={`preset-card ${isSelected ? 'active' : ''}`}
-                        onClick={() => setSelectedPreset(key)}
-                      >
-                        <div className="preset-card-glow" />
-                        <span className="preset-icon">{aspectIcon}</span>
-                        <span className="preset-label">{label.split(" (")[0]}</span>
-                        <span className="preset-sub">{label.includes(" (") ? `(${label.split(" (")[1]}` : ''}</span>
-                        {isSelected && <span className="selected-badge"><Check size={10} /></span>}
-                      </div>
-                    );
-                  })}
+              ) : (
+                <div className="url-input-box">
+                  <input 
+                    type="text" 
+                    placeholder="https://youtube.com/watch?v=..." 
+                    value={url}
+                    onChange={(e) => {
+                      setUrl(e.target.value);
+                      setError(null);
+                    }}
+                    className="stealth-input"
+                    disabled={isUploading}
+                  />
+                  <small className="text-muted text-xs block mt-2 px-1">Paste a YouTube link or direct video URL.</small>
                 </div>
+              )}
+            </div>
 
-                {/* Advanced Settings Toggle */}
-                <div className="advanced-toggle-wrapper mt-4">
-                  <button 
-                    type="button"
-                    className="advanced-toggle-btn"
-                    onClick={() => setShowAdvanced(!showAdvanced)}
-                  >
-                    {showAdvanced ? "Hide advanced settings" : "Show advanced settings"}
-                  </button>
-                </div>
+            <div className="modal-body presets-section">
+              <h3 className="section-title">Format</h3>
+              
+              <div className="presets-grid">
+                {Object.entries(presetsList).map(([key, value]) => {
+                  const isSelected = selectedPreset === key;
+                  const label = value.label || key;
+                  let aspectIcon = <Smartphone size={16} />;
+                  if (key === 'landscape') aspectIcon = <Monitor size={16} />;
+                  if (key === 'square') aspectIcon = <SquareIcon size={16} />;
 
-                {/* Progressive Disclosure Section */}
-                <AnimatePresence>
-                  {showAdvanced && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="advanced-settings-content mt-2"
-                      style={{ overflow: 'hidden' }}
+                  return (
+                    <div 
+                      key={key} 
+                      className={`preset-card ${isSelected ? 'active' : ''}`}
+                      onClick={() => setSelectedPreset(key)}
                     >
-                      {/* Caption Styles Selection */}
-                      <div className="style-selection-box mt-2">
-                        <label className="input-label">Subtitle Caption Style</label>
-                        <div className="select-container">
-                          <select 
-                            value={selectedStyle}
-                            onChange={(e) => setSelectedStyle(e.target.value)}
-                            className="stealth-select-styled"
-                          >
-                            {Object.entries(stylesList).map(([key, val]) => (
-                              <option key={key} value={key}>
-                                {val.name || key.replace('_', ' ').toUpperCase()}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Hook optimization checkbox */}
-                      <label className="checkbox-container mt-4">
-                        <input 
-                          type="checkbox" 
-                          checked={enableHookOpt} 
-                          onChange={(e) => setEnableHookOpt(e.target.checked)} 
-                        />
-                        <span className="checkbox-custom" />
-                        <div className="checkbox-text">
-                          <span>Enable AI Hook Optimization</span>
-                          <small>Find stronger hook moments before rendering.</small>
-                        </div>
-                      </label>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      <div className="preset-card-glow" />
+                      <span className="preset-icon">{aspectIcon}</span>
+                      <span className="preset-label">{label.split(" (")[0]}</span>
+                      <span className="preset-sub">{label.includes(" (") ? `(${label.split(" (")[1]}` : ''}</span>
+                      {isSelected && <span className="selected-badge"><Check size={10} /></span>}
+                    </div>
+                  );
+                })}
               </div>
-            )}
+
+              <div className="advanced-toggle-wrapper mt-4">
+                <button 
+                  type="button"
+                  className="advanced-toggle-btn"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                >
+                  {showAdvanced ? "Hide advanced settings" : "Show advanced settings"}
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {showAdvanced && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="advanced-settings-content mt-2"
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div className="style-selection-box mt-2">
+                      <label className="input-label">Caption Style</label>
+                      <div className="select-container">
+                        <select 
+                          value={selectedStyle}
+                          onChange={(e) => setSelectedStyle(e.target.value)}
+                          className="stealth-select-styled"
+                        >
+                          {Object.entries(stylesList).map(([key, val]) => (
+                            <option key={key} value={key}>
+                              {val.name || key.replace('_', ' ').toUpperCase()}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <label className="checkbox-container mt-4">
+                      <input 
+                        type="checkbox" 
+                        checked={enableHookOpt} 
+                        onChange={(e) => setEnableHookOpt(e.target.checked)} 
+                      />
+                      <span className="checkbox-custom" />
+                      <div className="checkbox-text">
+                        <span>Auto-detect best hooks</span>
+                        <small>AI finds the most engaging moments automatically.</small>
+                      </div>
+                    </label>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
             <div className="modal-footer">
               <AnimatePresence>
@@ -373,47 +355,40 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
               
               {isUploading && (
                 <div className="upload-progress">
-                  <span><Loader2 className="spin" size={14} /> Uploading and starting pipeline</span>
-                  <i />
+                  <span>
+                    <Loader2 className="spin" size={14} />
+                    {uploadProgress !== null && uploadProgress < 100 
+                      ? `Uploading... ${uploadProgress}%` 
+                      : 'Processing video...'}
+                  </span>
+                  {uploadProgress !== null && (
+                    <div className="progress-track">
+                      <div 
+                        className="progress-fill" 
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
-              {step === 1 ? (
-                <div className="flex gap-3 w-full">
-                  <button 
-                    className="glow-button flex-1" 
-                    disabled={isNextDisabled}
-                    onClick={() => setStep(2)}
-                  >
-                    Next: Configure Layout ⚡
-                  </button>
-                </div>
-              ) : (
-                <div className="flex gap-3 w-full">
-                  <button 
-                    className="reset-btn glass-btn" 
-                    disabled={isUploading}
-                    onClick={() => setStep(1)}
-                  >
-                    Back
-                  </button>
-                  <button 
-                    className="glow-button flex-1" 
-                    disabled={isUploading}
-                    onClick={handleUpload}
-                  >
-                    {isUploading ? (
-                      <>
-                        <Loader2 className="spin" size={16} /> Starting pipeline
-                      </>
-                    ) : (
-                      <>
-                        Generate Clips ⚡
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
+              <div className="flex gap-3 w-full">
+                <button 
+                  className="glow-button flex-1" 
+                  disabled={isUploading}
+                  onClick={handleUpload}
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="spin" size={16} /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      Generate Shorts ⚡
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             <style jsx>{`
@@ -471,40 +446,6 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
               .close-btn:hover {
                 color: #fff;
                 background: rgba(255,255,255,0.1);
-              }
-              
-              .step-indicator-bar {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 8px;
-                margin: 0 auto;
-                width: fit-content;
-              }
-              .step-dot {
-                width: 24px;
-                height: 24px;
-                border-radius: 50%;
-                background: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                color: var(--muted);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 11px;
-                font-weight: 800;
-                transition: all 0.3s ease;
-              }
-              .step-dot.active {
-                background: var(--accent);
-                border-color: var(--accent);
-                color: #fff;
-                box-shadow: 0 0 10px rgba(246, 92, 139, 0.3);
-              }
-              .step-line {
-                width: 40px;
-                height: 2px;
-                background: rgba(255, 255, 255, 0.08);
               }
               
               .modal-tabs {
@@ -833,39 +774,21 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
                 justify-content: center;
                 gap: 8px;
               }
-              .upload-progress i {
+              .progress-track {
+                width: 100%;
                 height: 6px;
                 border-radius: 999px;
                 overflow: hidden;
-                background: linear-gradient(90deg, #06b6d4, #f65c8b, #06b6d4);
-                background-size: 200% 100%;
-                animation: progressMove 1.1s linear infinite;
+                background: rgba(255, 255, 255, 0.08);
+              }
+              .progress-fill {
+                height: 100%;
+                border-radius: 999px;
+                background: linear-gradient(90deg, #06b6d4, #7c3aed);
+                transition: width 0.3s ease;
               }
               .spin {
                 animation: spin 1.1s linear infinite;
-              }
-              .reset-btn {
-                background: none;
-                padding: 10px 20px;
-                border-radius: 10px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 8px;
-                font-size: 13px;
-                font-weight: 600;
-                color: var(--muted);
-                cursor: pointer;
-                transition: all 0.2s ease;
-              }
-              .glass-btn {
-                background: rgba(255, 255, 255, 0.03);
-                border: 1px solid rgba(255, 255, 255, 0.06);
-              }
-              .glass-btn:hover {
-                background: rgba(255, 255, 255, 0.08);
-                color: #fff;
-                border-color: rgba(255, 255, 255, 0.12);
               }
               .advanced-toggle-btn {
                 background: rgba(255, 255, 255, 0.03);
@@ -913,9 +836,6 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
               @keyframes modalIn {
                 from { opacity: 0; transform: translateY(10px) scale(0.98); }
                 to { opacity: 1; transform: translateY(0) scale(1); }
-              }
-              @keyframes progressMove {
-                to { background-position: 200% 0; }
               }
               @keyframes spin {
                 to { transform: rotate(360deg); }
