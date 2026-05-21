@@ -37,7 +37,7 @@ Built with **FastAPI**, **Celery**, **Whisper**, and **LLaMA 3**, it handles the
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-username/clip-aura.git
+git clone https://github.com/your-username/Clip-Aura.git
 cd Clip-Aura
 ```
 

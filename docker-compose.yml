@@ -2,12 +2,11 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6380:6379"
+      - "6379:6379"
     restart: unless-stopped
 
   web:
     build: .
-    command: sh -c "mkdir -p /db && ( [ -f /db/clip_aura.db ] || [ ! -f /app/clip_aura.db ] || cp /app/clip_aura.db /db/clip_aura.db ) && exec uvicorn app.api.main:app --host 0.0.0.0 --port 8000 --reload"
     ports:
       - "8000:8000"
     volumes:
@@ -15,33 +14,28 @@ services:
       - ./uploads:/app/uploads
       - ./output:/app/output
       - ./temp:/app/temp
-      - db_data:/db
+      - ./clip_aura.db:/app/clip_aura.db
     env_file:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=sqlite:////db/clip_aura.db
     depends_on:
       - redis
     restart: unless-stopped
 
   worker:
     build: .
-    command: sh -c "mkdir -p /db && ( [ -f /db/clip_aura.db ] || [ ! -f /app/clip_aura.db ] || cp /app/clip_aura.db /db/clip_aura.db ) && exec celery -A app.worker.celery_app worker --loglevel=info --concurrency=1"
+    command: celery -A app.worker.celery_app worker --loglevel=info
     volumes:
       - .:/app
       - ./uploads:/app/uploads
       - ./output:/app/output
       - ./temp:/app/temp
-      - db_data:/db
+      - ./clip_aura.db:/app/clip_aura.db
     env_file:
       - .env
     environment:
       - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=sqlite:////db/clip_aura.db
     depends_on:
       - redis
     restart: unless-stopped
-
-volumes:
-  db_data:

@@ -1,9 +1,5 @@
 # Clip Aura Development Helper Script
 
-param (
-    [Parameter(Mandatory=$false)][string]$action = "help"
-)
-
 function Show-Help {
     Write-Host "Clip Aura Dev Tools" -ForegroundColor Cyan
     Write-Host "-------------------"
@@ -13,6 +9,10 @@ function Show-Help {
     Write-Host "test     : Run smoke tests"
     Write-Host "clean    : Remove temporary outputs and caches"
 }
+
+param (
+    [Parameter(Mandatory=$false)][string]$action = "help"
+)
 
 switch ($action) {
     "run" {
@@ -30,7 +30,7 @@ switch ($action) {
         python .\scripts\smoke_test.py
     }
     "clean" {
-        Remove-Item -Recurse -Force .\output\*, .\uploads\*, .\temp\* -ErrorAction SilentlyContinue
+        Remove-Item -Recurse -Force .\outputs\* -ErrorAction SilentlyContinue
         Write-Host "🧹 Outputs cleaned" -ForegroundColor Green
     }
     Default {
