@@ -209,6 +209,10 @@ button:disabled {
 .nav-links a:hover {
   background: rgba(255, 255, 255, 0.055);
   color: #ffffff;
+.nav-links a.active {
+  background: rgba(124, 58, 237, 0.12);
+  color: var(--accent);
+}
 }
 
 .nav-btn,

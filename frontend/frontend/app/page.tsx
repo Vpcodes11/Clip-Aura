@@ -45,7 +45,7 @@ export default function Home() {
       </section>
 
       {/* Bento Grid Features */}
-      <section className="bento-section">
+      <section id="features" className="bento-section">
         <motion.div 
           variants={container}
           initial="hidden"

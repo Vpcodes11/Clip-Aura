@@ -22,14 +22,11 @@ export default function RootLayout({
             <div className="nav-container">
               <div className="logo-text">CLIP AURA</div>
               <div className="nav-links">
-                <Link href="/dashboard">Features</Link>
-                <Link href="/dashboard/billing">Pricing</Link>
-                <Link href="/dashboard/settings">System</Link>
-              </div>
-              <Link href="/dashboard">
+                <Link href="/#features">Features</Link>
+                <Link href="/login">Pricing</Link>              </div>
+              <Link href="/login">
                 <button className="nav-btn">Access Beta</button>
-              </Link>
-            </div>
+              </Link>              </div>
           </nav>
           <ErrorBoundary>
             {children}
