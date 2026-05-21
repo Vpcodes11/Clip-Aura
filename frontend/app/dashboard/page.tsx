@@ -6,12 +6,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
-  FileVideo,
-  Link2,
   Loader2,
   Plus,
   Search,
-  Sparkles,
   Trash2,
   UploadCloud,
 } from "lucide-react";
@@ -63,7 +60,6 @@ export default function Dashboard() {
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "active" | "complete" | "error">("all");
 
   const hasActiveRef = useRef(false);
 
@@ -113,23 +109,16 @@ export default function Dashboard() {
     }
   };
 
-  const counts = useMemo(() => {
-    const active = jobs.filter((job) => activeStatuses.includes(job.status)).length;
-    const ready = jobs.filter((job) => job.status === "complete").length;
-    const issues = jobs.filter((job) => job.status === "error").length;
-    const clips = jobs.reduce((total, job) => total + (job.clips?.length || 0), 0);
-    return { active, ready, issues, clips };
-  }, [jobs]);
+  const readyCount = useMemo(() => jobs.filter((j) => j.status === "complete").length, [jobs]);
+  const activeCount = useMemo(() => jobs.filter((j) => activeStatuses.includes(j.status)).length, [jobs]);
 
   const visibleJobs = jobs.filter((job) => {
-    if (filter === "active" && !activeStatuses.includes(job.status)) return false;
-    if (filter === "complete" && job.status !== "complete") return false;
-    if (filter === "error" && job.status !== "error") return false;
-
     const needle = query.trim().toLowerCase();
     if (!needle) return true;
     return `${job.id} ${job.source || ""} ${job.status}`.toLowerCase().includes(needle);
   });
+
+  const showEmptyState = !isLoading && jobs.length === 0;
 
   return (
     <div className="clean-dashboard">
@@ -137,12 +126,8 @@ export default function Dashboard() {
 
       <section className="dashboard-hero">
         <div>
-          <span className="eyebrow">
-            <Sparkles size={14} />
-            Workspace
-          </span>
           <h1>Projects</h1>
-          <p>Import long-form videos and monitor generation status. Review finished clips in the Clips space.</p>
+          <p>Import a video and let AI find the best moments.</p>
         </div>
         <button className="primary-action" onClick={() => setIsUploadOpen(true)}>
           <Plus size={18} />
@@ -150,153 +135,108 @@ export default function Dashboard() {
         </button>
       </section>
 
-      <section className="start-strip">
-        <button className="start-card" onClick={() => setIsUploadOpen(true)}>
-          <UploadCloud size={22} />
-          <span>
-            <strong>Upload video</strong>
-            <small>Local MP4, MOV, WEBM</small>
-          </span>
-        </button>
-        <button className="start-card" onClick={() => setIsUploadOpen(true)}>
-          <Link2 size={22} />
-          <span>
-            <strong>Paste video link</strong>
-            <small>YouTube, Vimeo, direct URL</small>
-          </span>
-        </button>
-        <Link className="start-card clips-link" href="/dashboard/clips">
-          <FileVideo size={22} />
-          <span>
-            <strong>{counts.clips} generated clips</strong>
-            <small>Open the clip review space</small>
-          </span>
-        </Link>
-      </section>
-
-      <section className="metrics-row">
-        <div><span>Active</span><strong>{counts.active}</strong></div>
-        <div><span>Ready</span><strong>{counts.ready}</strong></div>
-        <div><span>Issues</span><strong>{counts.issues}</strong></div>
-        <div><span>Total projects</span><strong>{jobs.length}</strong></div>
-      </section>
-
-      <section className="project-panel">
-        <div className="panel-top">
-          <div>
-            <h2>Project queue</h2>
-            <p>One row per source video. Error details stay collapsed so the queue stays readable.</p>
-            {actionError && <div className="inline-error">{actionError}</div>}
+      {showEmptyState ? (
+        <section className="empty-guide">
+          <div className="empty-guide-card upload" onClick={() => setIsUploadOpen(true)}>
+            <UploadCloud size={28} />
+            <h2>Upload a video</h2>
+            <p>MP4, MOV, or WEBM — up to 2 GB</p>
           </div>
-          <div className="toolbar">
+          <div className="empty-guide-card url" onClick={() => setIsUploadOpen(true)}>
+            <Plus size={28} />
+            <h2>Paste a link</h2>
+            <p>YouTube, Vimeo, or any public video URL</p>
+          </div>
+        </section>
+      ) : (
+        <section className="project-panel">
+          <div className="panel-top">
+            <div>
+              <h2>
+                {visibleJobs.length} project{visibleJobs.length !== 1 ? "s" : ""}
+                {activeCount > 0 && <span className="active-badge">{activeCount} active</span>}
+                {readyCount > 0 && <span className="ready-badge">{readyCount} ready</span>}
+              </h2>
+              {actionError && <div className="inline-error">{actionError}</div>}
+            </div>
             <div className="search-box">
               <Search size={15} />
               <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search projects..." />
             </div>
-            <div className="tabs">
-              {[
-                ["all", "All"],
-                ["active", "Active"],
-                ["complete", "Ready"],
-                ["error", "Issues"],
-              ].map(([value, label]) => (
-                <button key={value} className={filter === value ? "active" : ""} onClick={() => setFilter(value as typeof filter)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="project-table">
-          <div className="table-head">
-            <span>Source</span>
-            <span>Status</span>
-            <span>Clips</span>
-            <span>Progress</span>
-            <span></span>
           </div>
 
-          {isLoading && jobs.length === 0 && (
-            <div className="empty-state">
-              <Loader2 className="spin" size={18} />
-              Loading projects...
-            </div>
-          )}
+          <div className="project-table">
+            {isLoading && jobs.length === 0 && (
+              <div className="empty-state">
+                <Loader2 className="spin" size={18} />
+                Loading projects...
+              </div>
+            )}
 
-          {!isLoading && visibleJobs.length === 0 && (
-            <div className="empty-state">
-              <FileVideo size={18} />
-              No projects match this view.
-            </div>
-          )}
+            {!isLoading && visibleJobs.length === 0 && (
+              <div className="empty-state">
+                No projects match your search.
+              </div>
+            )}
 
-          {visibleJobs.map((job) => {
-            const progress = Math.max(0, Math.min(100, job.progress || (job.status === "complete" ? 100 : 0)));
-            return (
-              <article key={job.id} className={`project-row ${job.status}`}>
-                <div className="source-cell">
-                  <span className="status-icon"><StatusIcon status={job.status} /></span>
-                  <div>
-                    <h3>{projectName(job)}</h3>
-                    <small>ID: {job.id}</small>
-                    {job.status === "error" && job.message && <details><summary>View issue</summary>{job.message}</details>}
+            {visibleJobs.map((job) => {
+              const progress = Math.max(0, Math.min(100, job.progress || (job.status === "complete" ? 100 : 0)));
+              return (
+                <article key={job.id} className={`project-row ${job.status}`}>
+                  <div className="source-cell">
+                    <span className="status-icon"><StatusIcon status={job.status} /></span>
+                    <div>
+                      <h3>{projectName(job)}</h3>
+                      <small>{job.id}</small>
+                      {job.status === "error" && job.message && (
+                        <details><summary>View issue</summary>{job.message}</details>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <span className={`status-pill ${job.status}`}>{statusLabel(job.status)}</span>
-                <span className="clip-count">{job.clips?.length || 0}</span>
-                <div className="progress-cell">
-                  <span>{progress}%</span>
-                  <div><i style={{ width: `${progress}%` }} /></div>
-                </div>
-                <div className="row-actions">
-                  {job.status === "complete" && <Link href="/dashboard/clips">View clips</Link>}
-                  <button onClick={() => handleDeleteJob(job.id)} title="Delete project" disabled={deletingJobId === job.id}>
-                    {deletingJobId === job.id ? <Loader2 className="spin" size={15} /> : <Trash2 size={15} />}
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
+                  <div className="meta-cell">
+                    <span className={`status-pill ${job.status}`}>{statusLabel(job.status)}</span>
+                    <span className="clip-badge">{job.clips?.length || 0} clip{(job.clips?.length || 0) !== 1 ? "s" : ""}</span>
+                    <div className="progress-bar">
+                      <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+                    </div>
+                  </div>
+                  <div className="row-actions">
+                    {job.status === "complete" && <Link href="/dashboard/clips">View clips</Link>}
+                    <button onClick={() => handleDeleteJob(job.id)} title="Delete project" disabled={deletingJobId === job.id}>
+                      {deletingJobId === job.id ? <Loader2 className="spin" size={15} /> : <Trash2 size={15} />}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       <style jsx>{`
         .clean-dashboard {
           display: flex;
           flex-direction: column;
-          gap: 22px;
+          gap: 28px;
         }
 
         .dashboard-hero {
           display: flex;
           justify-content: space-between;
-          align-items: flex-end;
+          align-items: flex-start;
           gap: 20px;
         }
 
-        .eyebrow {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          color: var(--accent-2);
-          font-size: 12px;
-          font-weight: 800;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          margin-bottom: 10px;
-        }
-
         h1 {
-          font-size: clamp(36px, 5vw, 56px);
+          font-size: clamp(32px, 5vw, 48px);
           line-height: 1;
+          margin-bottom: 8px;
         }
 
-        .dashboard-hero p,
-        .panel-top p {
+        .dashboard-hero p {
           color: var(--muted);
-          margin-top: 8px;
-          line-height: 1.6;
+          line-height: 1.5;
+          max-width: 42ch;
         }
 
         .inline-error {
@@ -311,20 +251,6 @@ export default function Dashboard() {
           font-weight: 700;
         }
 
-        .primary-action,
-        .start-card,
-        .tabs button,
-        .row-actions button,
-        .row-actions a {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          border: 0;
-          cursor: pointer;
-          color: inherit;
-        }
-
         .primary-action {
           min-height: 46px;
           border-radius: 12px;
@@ -333,115 +259,105 @@ export default function Dashboard() {
           color: #05060a;
           font-weight: 800;
           white-space: nowrap;
+          border: 0;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          flex-shrink: 0;
         }
 
-        .start-strip {
+        .empty-guide {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(2, 1fr);
           gap: 14px;
         }
 
-        .start-card,
-        .metrics-row div,
+        .empty-guide-card {
+          min-height: 180px;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 18px;
+          padding: 32px 28px;
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 12px;
+          background: rgba(10, 13, 22, 0.62);
+          cursor: pointer;
+          transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+        }
+
+        .empty-guide-card:hover {
+          transform: translateY(-2px);
+          border-color: rgba(6, 182, 212, 0.28);
+          background: rgba(10, 13, 22, 0.82);
+        }
+
+        .empty-guide-card svg {
+          color: var(--accent-2);
+        }
+
+        .empty-guide-card h2 {
+          font-family: var(--font-outfit);
+          font-size: 20px;
+        }
+
+        .empty-guide-card p {
+          color: var(--muted);
+          font-size: 14px;
+          line-height: 1.5;
+        }
+
         .project-panel {
           border: 1px solid rgba(255, 255, 255, 0.1);
           background: rgba(10, 13, 22, 0.78);
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 18px 60px rgba(0, 0, 0, 0.22);
           backdrop-filter: blur(18px);
           -webkit-backdrop-filter: blur(18px);
-        }
-
-        .start-card {
-          min-height: 96px;
-          border-radius: 18px;
-          padding: 20px;
-          justify-content: flex-start;
-          text-align: left;
-          transition: transform 0.18s ease, border-color 0.18s ease;
-        }
-
-        .start-card:hover {
-          transform: translateY(-2px);
-          border-color: rgba(6, 182, 212, 0.32);
-        }
-
-        .start-card svg {
-          color: var(--accent-2);
-          flex: 0 0 auto;
-        }
-
-        .start-card span {
-          display: grid;
-          gap: 4px;
-        }
-
-        .start-card strong {
-          font-family: var(--font-outfit);
-          font-size: 17px;
-        }
-
-        .start-card small,
-        .table-head,
-        .source-cell small,
-        details {
-          color: var(--muted);
-        }
-
-        .clips-link {
-          text-decoration: none;
-        }
-
-        .metrics-row {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 12px;
-        }
-
-        .metrics-row div {
-          border-radius: 16px;
-          padding: 18px;
-          display: grid;
-          gap: 8px;
-        }
-
-        .metrics-row span {
-          color: var(--muted);
-          font-size: 12px;
-          font-weight: 750;
-        }
-
-        .metrics-row strong {
-          font-family: var(--font-outfit);
-          font-size: 30px;
-          line-height: 1;
-        }
-
-        .project-panel {
           border-radius: 20px;
           overflow: hidden;
         }
 
         .panel-top {
-          padding: 22px;
+          padding: 24px;
           border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-          display: grid;
-          gap: 18px;
-        }
-
-        .panel-top h2 {
-          font-size: 24px;
-        }
-
-        .toolbar {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 12px;
+          gap: 16px;
+          flex-wrap: wrap;
+        }
+
+        .panel-top h2 {
+          font-size: 18px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .active-badge,
+        .ready-badge {
+          font-family: var(--font-inter);
+          font-size: 12px;
+          font-weight: 700;
+          border-radius: 999px;
+          padding: 3px 9px;
+        }
+
+        .active-badge {
+          background: rgba(6, 182, 212, 0.12);
+          color: #67e8f9;
+        }
+
+        .ready-badge {
+          background: rgba(16, 185, 129, 0.12);
+          color: #86efac;
         }
 
         .search-box {
           flex: 1;
-          min-height: 44px;
+          max-width: 280px;
+          min-height: 40px;
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 12px;
           padding: 0 13px;
@@ -461,54 +377,17 @@ export default function Dashboard() {
           font-size: 14px;
         }
 
-        .tabs {
-          display: flex;
-          gap: 4px;
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 12px;
-          padding: 4px;
-          background: rgba(255, 255, 255, 0.045);
-        }
-
-        .tabs button {
-          min-height: 34px;
-          border-radius: 9px;
-          padding: 0 11px;
-          background: transparent;
-          color: var(--muted);
-          font-size: 13px;
-          font-weight: 750;
-        }
-
-        .tabs button.active {
-          background: rgba(255, 255, 255, 0.11);
-          color: #ffffff;
-        }
-
         .project-table {
           display: grid;
         }
 
-        .table-head,
         .project-row {
           display: grid;
-          grid-template-columns: minmax(260px, 1fr) 120px 80px 160px 130px;
-          gap: 14px;
+          grid-template-columns: minmax(220px, 1fr) 220px auto;
+          gap: 16px;
           align-items: center;
-        }
-
-        .table-head {
-          padding: 12px 18px;
-          font-size: 11px;
-          font-weight: 800;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          background: rgba(255, 255, 255, 0.035);
-        }
-
-        .project-row {
-          min-height: 76px;
-          padding: 14px 18px;
+          min-height: 72px;
+          padding: 16px 24px;
           border-top: 1px solid rgba(255, 255, 255, 0.07);
         }
 
@@ -524,9 +403,9 @@ export default function Dashboard() {
         }
 
         .status-icon {
-          width: 38px;
-          height: 38px;
-          border-radius: 12px;
+          width: 36px;
+          height: 36px;
+          border-radius: 10px;
           display: grid;
           place-items: center;
           flex: 0 0 auto;
@@ -543,7 +422,7 @@ export default function Dashboard() {
         }
 
         .source-cell h3 {
-          max-width: 520px;
+          max-width: 440px;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
@@ -551,14 +430,16 @@ export default function Dashboard() {
         }
 
         .source-cell small {
+          color: var(--muted);
           font-size: 12px;
         }
 
         details {
-          margin-top: 5px;
-          max-width: 560px;
+          margin-top: 4px;
+          max-width: 440px;
           font-size: 12px;
           line-height: 1.45;
+          color: var(--muted);
         }
 
         details summary {
@@ -567,14 +448,20 @@ export default function Dashboard() {
           width: fit-content;
         }
 
+        .meta-cell {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
         .status-pill {
-          width: fit-content;
           border-radius: 999px;
-          padding: 5px 9px;
+          padding: 4px 8px;
           font-size: 12px;
           font-weight: 800;
           background: rgba(255, 255, 255, 0.06);
           color: var(--muted-strong);
+          white-space: nowrap;
         }
 
         .status-pill.complete {
@@ -591,31 +478,26 @@ export default function Dashboard() {
           color: #67e8f9;
         }
 
-        .clip-count {
-          color: var(--muted-strong);
-          font-weight: 800;
-        }
-
-        .progress-cell {
-          display: grid;
-          gap: 6px;
+        .clip-badge {
           color: var(--muted);
           font-size: 12px;
-          font-weight: 750;
+          font-weight: 650;
+          white-space: nowrap;
         }
 
-        .progress-cell div {
-          height: 7px;
+        .progress-bar {
+          width: 60px;
+          height: 5px;
           border-radius: 999px;
           overflow: hidden;
           background: rgba(255, 255, 255, 0.08);
         }
 
-        .progress-cell i {
-          display: block;
+        .progress-bar-fill {
           height: 100%;
           border-radius: inherit;
           background: linear-gradient(90deg, #06b6d4, #7c3aed);
+          transition: width 0.4s ease;
         }
 
         .row-actions {
@@ -633,6 +515,9 @@ export default function Dashboard() {
           text-decoration: none;
           font-size: 12px;
           font-weight: 800;
+          color: inherit;
+          display: inline-flex;
+          align-items: center;
         }
 
         .row-actions button {
@@ -641,6 +526,11 @@ export default function Dashboard() {
           border-radius: 9px;
           background: rgba(255, 255, 255, 0.045);
           color: var(--muted);
+          border: 0;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .row-actions button:hover {
@@ -649,12 +539,12 @@ export default function Dashboard() {
         }
 
         .empty-state {
-          min-height: 180px;
+          min-height: 140px;
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 10px;
           color: var(--muted);
+          font-size: 14px;
         }
 
         .spin {
@@ -667,39 +557,43 @@ export default function Dashboard() {
           }
         }
 
-        @media (max-width: 1180px) {
-          .table-head {
-            display: none;
-          }
-
+        @media (max-width: 860px) {
           .project-row {
             grid-template-columns: 1fr;
-            align-items: stretch;
+            gap: 10px;
+          }
+
+          .meta-cell {
+            flex-wrap: wrap;
           }
 
           .row-actions {
             justify-content: flex-start;
           }
+
+          .empty-guide {
+            grid-template-columns: 1fr;
+          }
         }
 
-        @media (max-width: 820px) {
-          .dashboard-hero,
-          .toolbar {
+        @media (max-width: 640px) {
+          .dashboard-hero {
             flex-direction: column;
             align-items: stretch;
           }
 
           .primary-action {
             width: 100%;
+            justify-content: center;
           }
 
-          .start-strip,
-          .metrics-row {
-            grid-template-columns: 1fr;
+          .panel-top {
+            flex-direction: column;
+            align-items: stretch;
           }
 
-          .tabs {
-            overflow-x: auto;
+          .search-box {
+            max-width: 100%;
           }
         }
       `}</style>

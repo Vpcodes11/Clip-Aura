@@ -3,14 +3,13 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { 
-  LayoutDashboard, 
-  Video, 
-  CreditCard, 
-  Settings, 
-  LogOut, 
+import {
+  Film,
+  Clapperboard,
+  Settings,
+  LogOut,
   Loader2,
-  Sparkles 
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 
@@ -23,21 +22,20 @@ export default function DashboardLayout({
   const router = useRouter();
   const { signOut, user, loading } = useAuth();
 
-  const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+  const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
   const usageLimit = isDevMode ? 1000 : 15;
   const userInitial = user?.user_metadata?.full_name?.charAt(0) || user?.email?.charAt(0) || "U";
 
   React.useEffect(() => {
     if (!loading && !user) {
-      router.replace("/login");
+      router.replace("/");
     }
   }, [loading, router, user]);
 
   const navItems = [
-    { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Projects", href: "/dashboard/projects", icon: Video },
-    { name: "Usage", href: "/dashboard/billing", icon: CreditCard },
-    { name: "System", href: "/dashboard/settings", icon: Settings },
+    { name: "Projects", href: "/dashboard", icon: Film },
+    { name: "Clips", href: "/dashboard/clips", icon: Clapperboard },
+    { name: "Settings", href: "/dashboard/settings", icon: Settings },
   ];
 
   if (loading || !user) {
@@ -51,17 +49,16 @@ export default function DashboardLayout({
 
   return (
     <div className="dashboard-wrapper">
-      {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
-          <div className="logo-box">O</div>
-          <div className="logo-name">CLIP AURA</div>
+          <div className="logo-box">C</div>
+          <div className="logo-name">Clip Aura</div>
         </div>
 
         <nav className="sidebar-nav">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || (item.href === "/dashboard" && pathname === "/dashboard/projects");
             return (
               <Link key={item.name} href={item.href} className={`nav-item ${isActive ? "active" : ""}`}>
                 <Icon size={18} />
@@ -79,17 +76,15 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="content-area">
-        {/* Top Header */}
         <header className="top-header">
           <div className="header-search">
-            <div className="search-badge">CMD + K TO SEARCH</div>
+            <span className="app-label">Clip Aura Studio</span>
           </div>
           <div className="header-actions">
             <div className="credit-pill">
-              <Sparkles size={14} className="text-accent" />
-              <span>{usageLimit} MINS REMAINING</span>
+              <Sparkles size={13} className="text-accent" />
+              <span>{usageLimit} min remaining</span>
             </div>
             <div className="user-avatar" title={user?.email}>
               {userInitial.toUpperCase()}
@@ -101,7 +96,6 @@ export default function DashboardLayout({
           {children}
         </div>
       </main>
-
     </div>
   );
 }

@@ -4,8 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/AuthContext";
-import { Loader2, Shield, Lock, Mail, Sparkles, Chrome } from "lucide-react";
-import Link from "next/link";
+import { Loader2, Shield, Lock, Mail, Globe2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -184,7 +183,7 @@ export default function LoginPage() {
           disabled={loading}
           className="w-full nav-btn flex items-center justify-center gap-2 border border-border rounded-lg py-3 text-sm font-bold text-white bg-transparent hover:bg-white/5 cursor-pointer transition"
         >
-          <Chrome size={16} />
+          <Globe2 size={16} />
           Continue with Google
         </button>
 
