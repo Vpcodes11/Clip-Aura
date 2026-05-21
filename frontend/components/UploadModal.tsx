@@ -11,6 +11,10 @@ interface UploadModalProps {
   onUploadStarted?: () => void;
 }
 
+type PresetOption = { label?: string };
+type CaptionStyleOption = { name?: string };
+type UploadResponse = { job_id?: string };
+
 export default function UploadModal({ isOpen, onClose, onUploadStarted }: UploadModalProps) {
   const [activeTab, setActiveTab] = useState<'upload' | 'url'>('upload');
   const [file, setFile] = useState<File | null>(null);
@@ -28,13 +32,13 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   // Dynamic configurations fetched from API
-  const [presetsList, setPresetsList] = useState<Record<string, any>>({
+  const [presetsList, setPresetsList] = useState<Record<string, PresetOption>>({
     tiktok: { label: "TikTok / Reels (9:16)" },
     youtube_shorts: { label: "YouTube Shorts (9:16)" },
     square: { label: "Square (1:1)" },
     landscape: { label: "Landscape (16:9)" },
   });
-  const [stylesList, setStylesList] = useState<Record<string, any>>({
+  const [stylesList, setStylesList] = useState<Record<string, CaptionStyleOption>>({
     tiktok: { name: "TikTok Pop" },
     minimal: { name: "Minimal Modern" },
     viral: { name: "Viral Hook" },
@@ -71,12 +75,14 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
 
   // Reset modal state on open/close
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+
+    queueMicrotask(() => {
       setFile(null);
       setUrl('');
       setError(null);
       setShowAdvanced(false);
-    }
+    });
   }, [isOpen]);
 
   const handleUpload = async () => {
@@ -90,7 +96,7 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
       return;
     }
     setIsUploading(true);
-    setUploadProgress(0);
+    setUploadProgress(null);
     try {
       const formData = new FormData();
       if (activeTab === 'upload' && file) {
@@ -104,7 +110,7 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
  
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-      const data = await new Promise<any>((resolve, reject) => {
+      const data = await new Promise<UploadResponse>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${apiUrl}/api/upload`);
 
@@ -236,8 +242,8 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
                   ) : (
                     <>
                       <Upload size={32} className="text-muted" />
-                      <p>Drop your video here or click to browse</p>
-                      <span className="text-muted text-xs">MP4, MOV, WEBM — up to 2GB</span>
+                      <p>Drop a video here or tap to browse</p>
+                      <span className="text-muted text-xs">MP4, MOV, or WEBM up to 2 GB</span>
                     </>
                   )}
                 </div>
@@ -331,7 +337,7 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
                       <span className="checkbox-custom" />
                       <div className="checkbox-text">
                         <span>Auto-detect best hooks</span>
-                        <small>AI finds the most engaging moments automatically.</small>
+                        <small>Find stronger hook moments before rendering.</small>
                       </div>
                     </label>
                   </motion.div>
@@ -357,9 +363,11 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
                 <div className="upload-progress">
                   <span>
                     <Loader2 className="spin" size={14} />
-                    {uploadProgress !== null && uploadProgress < 100 
-                      ? `Uploading... ${uploadProgress}%` 
-                      : 'Processing video...'}
+                    {uploadProgress === null
+                      ? 'Starting upload...'
+                      : uploadProgress < 100
+                        ? `Uploading... ${uploadProgress}%`
+                        : 'Upload complete. Starting clips...'}
                   </span>
                   {uploadProgress !== null && (
                     <div className="progress-track">
@@ -376,7 +384,8 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
                 <button 
                   className="glow-button flex-1" 
                   disabled={isUploading}
-                  onClick={handleUpload}
+                  onClick={() => handleUpload()}
+                  type="button"
                 >
                   {isUploading ? (
                     <>
@@ -384,7 +393,7 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
                     </>
                   ) : (
                     <>
-                      Generate Shorts ⚡
+                      Start processing
                     </>
                   )}
                 </button>
@@ -582,8 +591,9 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
               }
               .preset-card:hover {
                 background: rgba(255, 255, 255, 0.04);
-                border-color: rgba(255, 255, 255, 0.15);
+                border-color: var(--accent);
                 transform: translateY(-2px);
+                box-shadow: 0 0 12px rgba(246, 92, 139, 0.15);
               }
               .preset-card.active {
                 background: rgba(246, 92, 139, 0.04);
@@ -813,7 +823,6 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
               .advanced-settings-content {
                 width: 100%;
               }
-
               @media (max-width: 640px) {
                 .modal-overlay {
                   align-items: flex-end;
@@ -831,6 +840,10 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
                 }
                 .presets-grid {
                   grid-template-columns: 1fr;
+                }
+                .flex.gap-3 {
+                  flex-direction: column;
+                  gap: 10px !important;
                 }
               }
               @keyframes modalIn {

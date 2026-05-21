@@ -26,6 +26,7 @@ interface Job {
   message?: string;
   source?: string;
   clips?: Clip[];
+  stage?: string;
 }
 
 const activeStatuses = ["queued", "downloading", "processing"];
@@ -99,7 +100,7 @@ export default function Dashboard() {
     }
   }, []);
 
-  React.useLayoutEffect(() => {
+  React.useEffect(() => {
     const id = setTimeout(() => fetchJobs(), 0);
     const interval = setInterval(() => {
       if (hasActiveRef.current) {
@@ -344,6 +345,18 @@ export default function Dashboard() {
         .active-badge {
           background: rgba(6, 182, 212, 0.12);
           color: #67e8f9;
+          animation: statusPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes statusPulse {
+          0%, 100% {
+            opacity: 0.82;
+            box-shadow: 0 0 0 rgba(6, 182, 212, 0);
+          }
+          50% {
+            opacity: 1;
+            box-shadow: 0 0 14px rgba(6, 182, 212, 0.18);
+          }
         }
 
         .ready-badge {
@@ -743,17 +756,20 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
   const [localJob, setLocalJob] = useState<Job>(job);
   const [logs, setLogs] = useState<string[]>([job.message || "Initializing..."]);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
 
   // Sync prop changes (e.g. if parent polls and finds job status changed)
   React.useEffect(() => {
-    setLocalJob(job);
-    if (job.message && !logs.includes(job.message)) {
+    queueMicrotask(() => {
+      setLocalJob(job);
+      if (!job.message) return;
       setLogs((prev) => {
         if (prev[prev.length - 1] === job.message) return prev;
         return [...prev, job.message!];
       });
-    }
+    });
   }, [job]);
 
   // Connect WebSocket for active jobs
@@ -781,6 +797,10 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
         const wsUrl = `${apiUrl.replace(/^http/, wsProtocol)}/ws/${localJob.id}?token=${token}`;
         
         socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+          if (isMounted) setWsConnected(true);
+        };
 
         socket.onmessage = (event) => {
           if (!isMounted) return;
@@ -829,10 +849,12 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
         };
 
         socket.onerror = (err) => {
+          if (isMounted) setWsConnected(false);
           console.error("WebSocket error for job", localJob.id, err);
         };
 
         socket.onclose = () => {
+          if (isMounted) setWsConnected(false);
           console.log("WebSocket closed for job", localJob.id);
         };
 
@@ -853,21 +875,21 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
 
   // Scroll logs to bottom
   React.useEffect(() => {
-    if (isExpanded && logEndRef.current) {
+    if (isExpanded && showLogs && logEndRef.current) {
       logEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [logs, isExpanded]);
+  }, [logs, isExpanded, showLogs]);
 
   const progress = Math.max(0, Math.min(100, localJob.progress || (localJob.status === "complete" ? 100 : 0)));
 
   // Calculate step statuses
   const steps = useMemo(() => {
     const defaultSteps = [
-      { id: 1, name: "Source Ingest", desc: "Downloading and validating media asset" },
-      { id: 2, name: "Neural Transcription", desc: "Converting speech to text via Whisper AI" },
-      { id: 3, name: "Virality Scoring", desc: "Hook analysis and virality scoring" },
-      { id: 4, name: "Cinematic Cut Alignment", desc: "Aligning clip bounds to speech patterns" },
-      { id: 5, name: "Caption Overlay & Render", desc: "Rendering templates and dynamic subtitles" },
+      { id: 1, name: "Importing Media", desc: "Preparing high-res source video..." },
+      { id: 2, name: "AI Caption Ingestion", desc: "Listening and mapping text..." },
+      { id: 3, name: "Hook Analysis", desc: "Locating highest-retention segments..." },
+      { id: 4, name: "Smart Reframing", desc: "Framing speakers & adjusting layouts..." },
+      { id: 5, name: "Polishing Short", desc: "Applying dynamic styling & rendering..." },
     ];
 
     const status = localJob.status;
@@ -937,7 +959,7 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
           </div>
         </div>
         <div className="row-actions">
-          {localJob.status === "complete" && <Link href="/dashboard/clips">View clips</Link>}
+          {localJob.status === "complete" && <Link href={`/dashboard/clips?job=${localJob.id}`}>View clips</Link>}
           {showChevron && (
             <button className="chevron-toggle-btn" onClick={() => setIsExpanded(!isExpanded)} title={isExpanded ? "Hide Details" : "Show Details"}>
               {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -951,9 +973,26 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
 
       {isExpanded && showChevron && (
         <div className="row-expansion-panel">
-          <div className="expansion-grid">
+          <div className={`expansion-grid ${showLogs ? 'with-logs' : 'no-logs'}`}>
             <div className="checklist-section">
-              <h4 className="section-title">Pipeline Progress</h4>
+              <div className="flex-justify-between flex-items-center mb-4">
+                <h4 className="section-title mb-0 flex-items-center">
+                  Pipeline Progress
+                  {wsConnected && (
+                    <span className="live-badge-inline flex-items-center ml-2">
+                      <span className="live-dot-pulse mr-1" /> Live Sync Active
+                    </span>
+                  )}
+                </h4>
+                <button 
+                  className="toggle-logs-btn" 
+                  onClick={() => setShowLogs(!showLogs)}
+                  type="button"
+                >
+                  <Terminal size={12} className="mr-1" />
+                  {showLogs ? "Hide Console Logs" : "Show Console Logs"}
+                </button>
+              </div>
               <div className="steps-timeline">
                 {steps.map((step, idx) => {
                   return (
@@ -977,22 +1016,29 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
                   );
                 })}
               </div>
+              {activeStatuses.includes(localJob.status) && (
+                <div className="countdown-estimate-text">
+                  Typically takes ~45 seconds. You can safely close this drawer.
+                </div>
+              )}
             </div>
 
-            <div className="console-log-section">
-              <h4 className="section-title flex-items-center">
-                <Terminal size={14} className="margin-right-6 text-accent" />
-                Live Execution Logs
-              </h4>
-              <div className="console-box">
-                {logs.map((log, index) => (
-                  <div key={index} className="log-line">
-                    <span className="log-prompt">&gt;</span> {log}
-                  </div>
-                ))}
-                <div ref={logEndRef} />
+            {showLogs && (
+              <div className="console-log-section">
+                <h4 className="section-title flex-items-center">
+                  <Terminal size={14} className="margin-right-6 text-accent" />
+                  Live Execution Logs
+                </h4>
+                <div className="console-box">
+                  {logs.map((log, index) => (
+                    <div key={index} className="log-line">
+                      <span className="log-prompt">&gt;</span> {log}
+                    </div>
+                  ))}
+                  <div ref={logEndRef} />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -1018,7 +1064,7 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
         .chevron-toggle-btn {
           width: 36px;
           height: 36px;
-          border-radius: 9px;
+          border-radius: 999px;
           background: rgba(255, 255, 255, 0.045);
           color: var(--muted);
           border: 0;
@@ -1049,8 +1095,53 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
 
         .expansion-grid {
           display: grid;
-          grid-template-columns: 1fr 1.2fr;
           gap: 32px;
+          transition: all 0.3s ease;
+        }
+
+        .expansion-grid.with-logs {
+          grid-template-columns: 1fr 1.2fr;
+        }
+
+        .expansion-grid.no-logs {
+          grid-template-columns: 1fr;
+        }
+
+        .flex-justify-between {
+          display: flex;
+          justify-content: space-between;
+        }
+
+        .mb-0 {
+          margin-bottom: 0 !important;
+        }
+
+        .mb-4 {
+          margin-bottom: 16px;
+        }
+
+        .mr-1 {
+          margin-right: 4px;
+        }
+
+        .toggle-logs-btn {
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          color: var(--muted-strong);
+          padding: 6px 12px;
+          border-radius: 8px;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          transition: all 0.2s ease;
+        }
+
+        .toggle-logs-btn:hover {
+          background: rgba(255, 255, 255, 0.06);
+          border-color: rgba(255, 255, 255, 0.15);
+          color: #ffffff;
         }
 
         .section-title {
@@ -1189,6 +1280,7 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
 
         .step-item.active .step-name {
           color: #ffffff;
+          animation: pulseText 2s infinite ease-in-out;
         }
 
         .step-item.done .step-name {
@@ -1244,6 +1336,12 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
           }
         }
 
+        @keyframes pulseText {
+          0% { opacity: 0.85; }
+          50% { opacity: 1; text-shadow: 0 0 8px rgba(255, 255, 255, 0.3); }
+          100% { opacity: 0.85; }
+        }
+
         @keyframes slideDown {
           from {
             opacity: 0;
@@ -1257,9 +1355,48 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
 
         @media (max-width: 768px) {
           .expansion-grid {
-            grid-template-columns: 1fr;
+            grid-template-columns: 1fr !important;
             gap: 24px;
           }
+        }
+        .live-dot-pulse {
+          width: 6px;
+          height: 6px;
+          background-color: #10b981;
+          border-radius: 50%;
+          display: inline-block;
+          animation: livePulse 1.5s infinite ease-in-out;
+        }
+        .mr-1 {
+          margin-right: 4px;
+        }
+        .ml-2 {
+          margin-left: 8px;
+        }
+        @keyframes livePulse {
+          0%, 100% { opacity: 0.6; transform: scale(0.9); }
+          50% { opacity: 1; transform: scale(1.2); box-shadow: 0 0 8px #10b981; }
+        }
+        .live-badge-inline {
+          font-family: var(--font-inter);
+          font-size: 11px;
+          color: #a7f3d0;
+          background: rgba(16, 185, 129, 0.08);
+          border: 1px solid rgba(16, 185, 129, 0.2);
+          border-radius: 999px;
+          padding: 2px 8px;
+          display: inline-flex;
+          align-items: center;
+          font-weight: 600;
+          text-transform: none;
+          letter-spacing: normal;
+        }
+        .countdown-estimate-text {
+          font-size: 12px;
+          color: var(--muted);
+          margin-top: 14px;
+          padding-left: 40px;
+          font-style: italic;
         }
       `}</style>
     </div>

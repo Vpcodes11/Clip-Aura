@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, Play, Save, RotateCcw, Video, Type, Sliders } from 'lucide-react';
+import { X, Sparkles, Play, Save, RotateCcw, Video, Type, Sliders, Share2 } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/supabase';
 
 export interface Word {
@@ -29,6 +29,7 @@ interface EditorModalProps {
   clip: Clip | null;
   clipIndex: number;
   onSaveSuccess: () => void;
+  onExport?: () => void;
 }
 
 function getMockWords(clip: Clip): Word[] {
@@ -51,7 +52,7 @@ function getMockWords(clip: Clip): Word[] {
   return mockWords;
 }
 
-export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, onSaveSuccess }: EditorModalProps) {
+export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, onSaveSuccess, onExport }: EditorModalProps) {
   const [words, setWords] = useState<Word[]>(() => {
     if (!clip) return [];
     if (clip.words && clip.words.length > 0) {
@@ -67,6 +68,9 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
   const [isSaving, setIsSaving] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeWordIdx, setActiveWordIdx] = useState<number | null>(null);
+  const [showSafeZones, setShowSafeZones] = useState(false);
+  const [editingWordIdx, setEditingWordIdx] = useState<number | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -223,12 +227,71 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                     className="preview-video"
                     onClick={handlePlayPause}
                     onEnded={() => setIsPlaying(false)}
+                    onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                   />
                   
+                  {/* Safe Zone Toggle Button */}
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowSafeZones(!showSafeZones);
+                    }}
+                    className={`safe-zone-toggle glass ${showSafeZones ? 'active' : ''}`}
+                    title="Toggle Social Media Safe Zones"
+                  >
+                    <Sliders size={14} />
+                    {showSafeZones ? "Hide Safe Zones" : "Show Safe Zones"}
+                  </button>
+
                   {/* Real-time Subtitle Overlay Simulation */}
                   {isPlaying && activeWordIdx !== null && words[activeWordIdx] && (
                     <div className="subtitle-overlay font-mono">
                       {words[activeWordIdx].word.toUpperCase()}
+                    </div>
+                  )}
+
+                  {/* Simulated TikTok Safe Zone Overlay */}
+                  {showSafeZones && (
+                    <div className="tiktok-safe-overlay">
+                      <div className="tok-header">
+                        <span>Following</span>
+                        <span className="active">For You</span>
+                      </div>
+
+                      <div className="tok-actions">
+                        <div className="tok-avatar">
+                          <div className="avatar-img" />
+                          <div className="avatar-plus">+</div>
+                        </div>
+                        <div className="tok-action-item">
+                          <div className="tok-icon-heart" />
+                          <span>142.8K</span>
+                        </div>
+                        <div className="tok-action-item">
+                          <div className="tok-icon-comment" />
+                          <span>1,248</span>
+                        </div>
+                        <div className="tok-action-item">
+                          <div className="tok-icon-bookmark" />
+                          <span>8.4K</span>
+                        </div>
+                        <div className="tok-action-item">
+                          <div className="tok-icon-share" />
+                          <span>24.5K</span>
+                        </div>
+                        <div className="tok-music-disc" />
+                      </div>
+
+                      <div className="tok-details">
+                        <div className="tok-username">@clipaura.ai</div>
+                        <div className="tok-caption">
+                          Cinematic AI short cuts with animated captions using ClipAura #editing #ai #shorts
+                        </div>
+                        <div className="tok-music">
+                          <span className="music-icon">♬</span>
+                          <span className="music-scroll">Original Sound - clipaura.ai</span>
+                        </div>
+                      </div>
                     </div>
                   )}
 
@@ -239,6 +302,48 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                         <Play size={24} fill="#fff" />
                       </button>
                     )}
+                  </div>
+                </div>
+
+                {/* Interactive Audio Waveform Seeker */}
+                <div className="audio-waveform-container glass">
+                  <div className="waveform-header">
+                    <span>Audio Waveform Seek Bar</span>
+                    <span className="font-mono text-xs">{currentTime.toFixed(1)}s / {(((clip.end_time || 10) - (clip.start_time || 0))).toFixed(1)}s</span>
+                  </div>
+                  <div 
+                    className="waveform-visualizer"
+                    onClick={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const clickX = e.clientX - rect.left;
+                      const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+                      const duration = (clip.end_time || 10) - (clip.start_time || 0);
+                      const targetSeek = ratio * duration;
+                      if (videoRef.current) {
+                        videoRef.current.currentTime = targetSeek;
+                        setCurrentTime(targetSeek);
+                      }
+                    }}
+                  >
+                    {Array.from({ length: 40 }).map((_, i) => {
+                      const duration = (clip.end_time || 10) - (clip.start_time || 0);
+                      const timeAtBar = (clip.start_time || 0) + (i / 40) * duration;
+                      const isSpoken = words.some(w => timeAtBar >= w.start && timeAtBar <= w.end);
+                      const barProgressRatio = i / 40;
+                      const videoCurrentRatio = currentTime / duration;
+                      const isActive = barProgressRatio <= videoCurrentRatio;
+                      const randomNoise = (Math.sin(i * 1.5) + 1) * 8;
+                      const baseHeight = isSpoken ? 55 : 20;
+                      const barHeight = Math.min(95, baseHeight + randomNoise);
+
+                      return (
+                        <div 
+                          key={i}
+                          className={`waveform-bar ${isActive ? 'active' : ''} ${isSpoken ? 'spoken' : ''}`}
+                          style={{ height: `${barHeight}%` }}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -302,19 +407,37 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                       {words.map((word, idx) => (
                         <div 
                           key={idx}
-                          className={`word-card ${activeWordIdx === idx ? 'active' : ''}`}
+                          className={`word-card ${activeWordIdx === idx ? 'active' : ''} ${editingWordIdx === idx ? 'editing' : ''}`}
                           onClick={() => handleWordClick(word)}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            setEditingWordIdx(idx);
+                          }}
+                          title="Click to seek · Double-click to edit text"
                         >
                           <div className="word-timestamp font-mono">
                             {word.start.toFixed(1)}s
                           </div>
-                          <input 
-                            type="text" 
-                            value={word.word ?? ''}
-                            onChange={(e) => handleWordChange(idx, e.target.value)}
-                            onClick={(e) => e.stopPropagation()} 
-                            className="word-input"
-                          />
+                          {editingWordIdx === idx ? (
+                            <input 
+                              type="text" 
+                              value={word.word ?? ''}
+                              onChange={(e) => handleWordChange(idx, e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  setEditingWordIdx(null);
+                                }
+                              }}
+                              onBlur={() => setEditingWordIdx(null)}
+                              className="word-input-edit"
+                              autoFocus
+                            />
+                          ) : (
+                            <div className="word-display font-medium">
+                              {word.word}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -348,8 +471,17 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                 <RotateCcw size={16} /> Reset
               </button>
               <div className="flex gap-4">
+                {onExport && (
+                  <button 
+                    className="export-trigger-btn glass flex items-center gap-2" 
+                    onClick={onExport}
+                    type="button"
+                  >
+                    <Share2 size={16} /> Export
+                  </button>
+                )}
                 <button className="glow-button flex items-center gap-2" onClick={handleSave}>
-                  <Save size={16} /> Save & Render ⚡
+                  <Save size={16} /> Save and render
                 </button>
               </div>
             </div>
@@ -685,6 +817,246 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             .gap-2 { gap: 8px; }
             .gap-4 { gap: 16px; }
             .items-center { align-items: center; }
+
+            .safe-zone-toggle {
+              position: absolute;
+              top: 12px;
+              right: 12px;
+              z-index: 20;
+              padding: 6px 12px;
+              border-radius: 8px;
+              font-size: 11px;
+              font-weight: 750;
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              color: var(--muted-strong);
+              background: rgba(10, 13, 22, 0.65);
+              border: 1px solid rgba(255, 255, 255, 0.08);
+              cursor: pointer;
+              transition: all 0.2s ease;
+            }
+            .safe-zone-toggle:hover {
+              background: rgba(10, 13, 22, 0.85);
+              color: #ffffff;
+              border-color: rgba(246, 92, 139, 0.3);
+            }
+            .safe-zone-toggle.active {
+              background: rgba(246, 92, 139, 0.15);
+              border-color: rgba(246, 92, 139, 0.4);
+              color: #f65c8b;
+            }
+
+            .tiktok-safe-overlay {
+              position: absolute;
+              inset: 0;
+              z-index: 10;
+              pointer-events: none;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              padding: 48px 12px 16px 12px;
+              color: #ffffff;
+              font-family: 'Inter', sans-serif;
+              background: rgba(0, 0, 0, 0.05);
+            }
+            .tok-header {
+              display: flex;
+              justify-content: center;
+              gap: 16px;
+              font-size: 14px;
+              font-weight: 600;
+              opacity: 0.65;
+            }
+            .tok-header span.active {
+              opacity: 1;
+              position: relative;
+            }
+            .tok-header span.active::after {
+              content: "";
+              position: absolute;
+              bottom: -4px;
+              left: 20%;
+              width: 60%;
+              height: 2px;
+              background: #ffffff;
+              border-radius: 99px;
+            }
+            .tok-actions {
+              position: absolute;
+              right: 8px;
+              bottom: 120px;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 14px;
+              opacity: 0.72;
+            }
+            .tok-avatar {
+              position: relative;
+              width: 38px;
+              height: 38px;
+              margin-bottom: 4px;
+            }
+            .avatar-img {
+              width: 100%;
+              height: 100%;
+              border-radius: 50%;
+              background: #f65c8b;
+              border: 1px solid #ffffff;
+            }
+            .avatar-plus {
+              position: absolute;
+              bottom: -4px;
+              left: 50%;
+              transform: translateX(-50%);
+              background: #fe2c55;
+              color: #ffffff;
+              font-size: 10px;
+              width: 14px;
+              height: 14px;
+              border-radius: 50%;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+            }
+            .tok-action-item {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 2px;
+            }
+            .tok-action-item span {
+              font-size: 10px;
+              font-weight: 600;
+            }
+            .tok-icon-heart::before { content: "❤️"; font-size: 22px; }
+            .tok-icon-comment::before { content: "💬"; font-size: 22px; }
+            .tok-icon-bookmark::before { content: "💛"; font-size: 22px; }
+            .tok-icon-share::before { content: "➡️"; font-size: 22px; }
+            .tok-music-disc {
+              width: 28px;
+              height: 28px;
+              border-radius: 50%;
+              background: conic-gradient(#111, #444, #111);
+              border: 4px solid #333;
+              animation: rotate 4s linear infinite;
+            }
+            
+            .tok-details {
+              display: flex;
+              flex-direction: column;
+              gap: 6px;
+              width: 78%;
+              text-align: left;
+              opacity: 0.72;
+              font-size: 12px;
+            }
+            .tok-username {
+              font-weight: 700;
+            }
+            .tok-caption {
+              line-height: 1.35;
+              display: -webkit-box;
+              -webkit-line-clamp: 3;
+              -webkit-box-orient: vertical;
+              overflow: hidden;
+            }
+            .tok-music {
+              display: flex;
+              align-items: center;
+              gap: 6px;
+              font-weight: 600;
+            }
+
+            .audio-waveform-container {
+              padding: 10px 14px;
+              border-radius: 12px;
+              display: flex;
+              flex-direction: column;
+              gap: 8px;
+            }
+            .waveform-header {
+              display: flex;
+              justify-content: space-between;
+              font-size: 11px;
+              font-weight: 750;
+              color: var(--muted);
+              text-transform: uppercase;
+              letter-spacing: 0.05em;
+            }
+            .waveform-visualizer {
+              height: 38px;
+              display: flex;
+              align-items: center;
+              gap: 3px;
+              cursor: pointer;
+              padding: 4px 0;
+            }
+            .waveform-bar {
+              flex: 1;
+              background: rgba(255, 255, 255, 0.16);
+              border-radius: 2px;
+              transition: background 0.1s ease, transform 0.1s ease;
+            }
+            .waveform-bar.active {
+              background: linear-gradient(to top, #8b5cf6, #f65c8b);
+            }
+            .waveform-bar.active.spoken {
+              background: linear-gradient(to top, #f65c8b, #ff7b9f);
+              box-shadow: 0 0 8px rgba(246, 92, 139, 0.4);
+            }
+            .waveform-visualizer:hover .waveform-bar {
+              transform: scaleY(1.05);
+            }
+
+            .word-display {
+              font-size: 14px;
+              color: #ffffff;
+              font-weight: 600;
+              text-align: center;
+              padding: 4px 0;
+            }
+            .word-card.editing {
+              border-color: rgba(246, 92, 139, 0.5);
+              background: rgba(0, 0, 0, 0.4);
+            }
+            .word-input-edit {
+              background: rgba(246, 92, 139, 0.08);
+              border: 1px solid rgba(246, 92, 139, 0.3);
+              border-radius: 6px;
+              color: #ffffff;
+              font-size: 14px;
+              font-weight: 600;
+              padding: 4px 8px;
+              outline: none;
+              width: 100%;
+              text-align: center;
+              transition: all 0.2s ease;
+            }
+            .word-input-edit:focus {
+              box-shadow: 0 0 8px rgba(246, 92, 139, 0.3);
+              border-color: #f65c8b;
+            }
+
+            .export-trigger-btn {
+              background: rgba(255, 255, 255, 0.05);
+              border: 1px solid rgba(255, 255, 255, 0.08);
+              color: var(--muted-strong);
+              padding: 0 16px;
+              height: 38px;
+              border-radius: 10px;
+              font-size: 13px;
+              font-weight: 750;
+              cursor: pointer;
+              transition: all 0.2s ease;
+            }
+            .export-trigger-btn:hover {
+              background: rgba(246, 92, 139, 0.1);
+              border-color: rgba(246, 92, 139, 0.3);
+              color: #ffffff;
+            }
           `}</style>
         </div>
       )}

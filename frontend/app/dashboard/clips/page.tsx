@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ExternalLink, FileVideo, Loader2, Play, Plus, Search, Share2 } from "lucide-react";
+import { ArrowUpDown, ExternalLink, FileVideo, Play, Plus, Search, Share2 } from "lucide-react";
 import EditorModal from "@/components/EditorModal";
 import ExportModal from "@/components/ExportModal";
 import type { Clip } from "@/components/EditorModal";
@@ -49,6 +50,8 @@ function ClipSkeletonGrid() {
 }
 
 export default function ClipsPage() {
+  const searchParams = useSearchParams();
+  const filterJobId = searchParams.get("job");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [query, setQuery] = useState("");
   const [activeEditorClip, setActiveEditorClip] = useState<{ jobId: string; clip: Clip; clipIndex: number } | null>(null);
@@ -56,6 +59,9 @@ export default function ClipsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shareMessage] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState("newest");
+
+  const hasActiveRef = useRef(false);
 
   const fetchJobs = React.useCallback(async () => {
     setError(null);
@@ -63,7 +69,11 @@ export default function ClipsPage() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await authenticatedFetch(`${apiUrl}/api/jobs`);
       if (!res.ok) throw new Error("Could not load generated clips.");
-      setJobs(await res.json());
+      const data = await res.json();
+      setJobs(data);
+      hasActiveRef.current = data.some((job: Job) =>
+        ["queued", "downloading", "processing"].includes(job.status),
+      );
     } catch (err) {
       console.error("Failed to fetch clips:", err);
       setError(err instanceof Error ? err.message : "Could not load generated clips.");
@@ -74,7 +84,9 @@ export default function ClipsPage() {
 
   React.useLayoutEffect(() => {
     const id = setTimeout(() => fetchJobs(), 0);
-    const interval = setInterval(fetchJobs, 12000);
+    const interval = setInterval(() => {
+      fetchJobs();
+    }, hasActiveRef.current ? 5000 : 12000);
     return () => {
       clearTimeout(id);
       clearInterval(interval);
@@ -94,11 +106,23 @@ export default function ClipsPage() {
     [jobs],
   );
 
-  const filteredClips = clips.filter((clip) => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return true;
-    return `${clip.title} ${clip.hook_caption || ""} ${clip.source || ""}`.toLowerCase().includes(needle);
-  });
+  const filteredClips = useMemo(() => {
+    const filtered = clips.filter((clip) => {
+      if (filterJobId && clip.jobId !== filterJobId) return false;
+      const needle = query.trim().toLowerCase();
+      if (!needle) return true;
+      return `${clip.title} ${clip.hook_caption || ""} ${clip.source || ""}`.toLowerCase().includes(needle);
+    });
+    return [...filtered].sort((a, b) => {
+      if (sortBy === "virality") return (b.virality_score || 0) - (a.virality_score || 0);
+      if (sortBy === "longest") {
+        const durA = typeof a.duration === "number" ? a.duration : parseFloat(String(a.duration || "0")) || 0;
+        const durB = typeof b.duration === "number" ? b.duration : parseFloat(String(b.duration || "0")) || 0;
+        return durB - durA;
+      }
+      return b.clipIndex - a.clipIndex;
+    });
+  }, [clips, query, sortBy, filterJobId]);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -137,13 +161,32 @@ export default function ClipsPage() {
       <section className="clips-hero">
         <div>
           <h1>Clips</h1>
-          <p>Your generated shorts. Edit, download, or share them.</p>
+          <p>Your AI-generated shorts. Edit, preview, or export them.</p>
         </div>
-        <div className="search-box">
+        <div className="hero-tools">
+          <div className="sort-bar">
+            <ArrowUpDown size={14} />
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="sort-select">
+              <option value="newest">Newest first</option>
+              <option value="virality">Highest score</option>
+              <option value="longest">Longest</option>
+            </select>
+          </div>
+          <div className="search-box">
           <Search size={15} />
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search clips..." />
         </div>
+        </div>
       </section>
+
+      {filterJobId && (
+        <div className="filter-chip-row">
+          <span className="filter-chip">
+            Filtered by project
+            <Link href="/dashboard/clips" className="filter-clear">&times;</Link>
+          </span>
+        </div>
+      )}
 
       {(error || shareMessage) && (
         <div className={`notice ${error ? "error" : ""}`}>
@@ -200,7 +243,6 @@ export default function ClipsPage() {
                 <div className="clip-meta">
                   {clip.virality_score > 0 && <span>Score {clip.virality_score}</span>}
                   {clip.duration && <span>{formatDuration(clip.duration)}</span>}
-                  <span>Clip {clip.clipIndex + 1}</span>
                 </div>
                 <div className="actions">
                   <button onClick={() => setActiveEditorClip({ jobId: clip.jobId, clip, clipIndex: clip.clipIndex })} className="edit-btn">
@@ -243,6 +285,35 @@ export default function ClipsPage() {
           color: var(--muted);
           line-height: 1.5;
           max-width: 42ch;
+        }
+
+        .hero-tools {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .sort-bar {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 12px;
+          padding: 0 12px;
+          min-height: 40px;
+          background: rgba(255, 255, 255, 0.045);
+          color: var(--muted);
+          flex-shrink: 0;
+        }
+
+        .sort-select {
+          background: transparent;
+          border: 0;
+          color: var(--muted-strong);
+          font-size: 13px;
+          font-weight: 650;
+          outline: 0;
+          cursor: pointer;
         }
 
         .search-box,
@@ -395,7 +466,6 @@ export default function ClipsPage() {
         }
 
         .clip-meta {
-          min-height: 18px;
           margin-top: 7px;
           display: flex;
           align-items: center;
@@ -404,6 +474,10 @@ export default function ClipsPage() {
           color: var(--muted);
           font-size: 11px;
           font-weight: 700;
+        }
+
+        .clip-meta:empty {
+          display: none;
         }
 
         .clip-meta span {
@@ -626,3 +700,4 @@ export default function ClipsPage() {
     </div>
   );
 }
+
