@@ -148,11 +148,11 @@ export default function Dashboard() {
       <section className="dashboard-hero">
         <div>
           <h1>Projects</h1>
-          <p>Import a video and let AI find the best moments.</p>
+          <p>Generate shorts from your videos with AI.</p>
         </div>
         <button className="primary-action" onClick={() => setIsUploadOpen(true)}>
           <Plus size={18} />
-          New project
+          Generate Shorts
         </button>
       </section>
 
