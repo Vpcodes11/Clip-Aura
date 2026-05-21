@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { Download, ExternalLink, FileVideo, Search, Share2, Sparkles } from "lucide-react";
+import { Download, ExternalLink, FileVideo, Loader2, Plus, Search, Share2 } from "lucide-react";
 import EditorModal from "@/components/EditorModal";
 import type { Clip } from "@/components/EditorModal";
 import { authenticatedFetch } from "@/lib/supabase";
@@ -21,9 +22,30 @@ type ClipWithJob = Clip & {
 };
 
 function formatDuration(duration?: string | number) {
-  if (!duration) return "0:30";
+  if (!duration) return "";
   if (typeof duration === "string") return duration;
   return `${duration.toFixed(duration % 1 === 0 ? 0 : 1)}s`;
+}
+
+function ClipSkeletonGrid() {
+  return (
+    <section className="clip-grid" aria-label="Loading clips">
+      {[0, 1, 2, 3].map((item) => (
+        <article className="clip-skeleton" key={item}>
+          <div className="skeleton-preview shimmer" />
+          <div className="skeleton-body">
+            <span className="skeleton-line shimmer wide" />
+            <span className="skeleton-line shimmer short" />
+            <div className="skeleton-actions">
+              <span className="skeleton-button shimmer" />
+              <span className="skeleton-square shimmer" />
+              <span className="skeleton-square shimmer" />
+            </div>
+          </div>
+        </article>
+      ))}
+    </section>
+  );
 }
 
 export default function ClipsPage() {
@@ -33,6 +55,7 @@ export default function ClipsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shareMessage, setShareMessage] = useState<string | null>(null);
+  const [downloadingClip, setDownloadingClip] = useState<string | null>(null);
 
   const fetchJobs = React.useCallback(async () => {
     setError(null);
@@ -101,6 +124,15 @@ export default function ClipsPage() {
     }
   };
 
+  const handleDownload = (clip: ClipWithJob) => {
+    const downloadKey = `${clip.jobId}-${clip.filename}`;
+    setDownloadingClip(downloadKey);
+    window.open(`${apiUrl}/api/download/${clip.jobId}/${clip.filename}`, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => setDownloadingClip((current) => (current === downloadKey ? null : current)), 1200);
+  };
+
+  const showEmptyState = !isLoading && clips.length === 0;
+
   return (
     <div className="clips-page">
       <EditorModal
@@ -115,12 +147,8 @@ export default function ClipsPage() {
 
       <section className="clips-hero">
         <div>
-          <span className="eyebrow">
-            <Sparkles size={14} />
-            Clip review
-          </span>
-          <h1>Generated clips</h1>
-          <p>Review, edit, download, and prepare your generated shorts without crowding the project queue.</p>
+          <h1>Clips</h1>
+          <p>Your generated shorts. Edit, download, or share them.</p>
         </div>
         <div className="search-box">
           <Search size={15} />
@@ -135,15 +163,16 @@ export default function ClipsPage() {
       )}
 
       {isLoading && clips.length === 0 ? (
-        <div className="empty-space">
-          <FileVideo size={28} />
-          Loading clips...
-        </div>
-      ) : filteredClips.length === 0 ? (
+        <ClipSkeletonGrid />
+      ) : showEmptyState ? (
         <div className="empty-space">
           <FileVideo size={34} />
-          <h2>No clips found</h2>
-          <p>Completed projects with generated clips will appear here.</p>
+          <h2>No clips yet</h2>
+          <p>Create a project first, and generated clips will appear here.</p>
+          <Link className="start-link" href="/dashboard">
+            <Plus size={16} />
+            Create a project
+          </Link>
         </div>
       ) : (
         <section className="clip-grid">
@@ -163,20 +192,19 @@ export default function ClipsPage() {
                   onMouseOver={(event) => event.currentTarget.play()}
                   onMouseOut={(event) => event.currentTarget.pause()}
                 />
-                <span className="score">Score {clip.virality_score}</span>
-                <span className="duration">{formatDuration(clip.duration)}</span>
+                {clip.virality_score > 0 && <span className="score">{clip.virality_score}</span>}
+                {clip.duration && <span className="duration">{formatDuration(clip.duration)}</span>}
               </div>
 
               <div className="body">
                 <h3>{clip.title}</h3>
-                <p>{clip.source || `Project ${clip.jobId}`}</p>
                 <div className="actions">
                   <button onClick={() => setActiveEditorClip({ jobId: clip.jobId, clip, clipIndex: clip.clipIndex })}>
                     <ExternalLink size={15} />
                     Edit
                   </button>
-                  <button onClick={() => window.open(`${apiUrl}/api/download/${clip.jobId}/${clip.filename}`)}>
-                    <Download size={15} />
+                  <button onClick={() => handleDownload(clip)} disabled={downloadingClip === `${clip.jobId}-${clip.filename}`}>
+                    {downloadingClip === `${clip.jobId}-${clip.filename}` ? <Loader2 className="spin" size={15} /> : <Download size={15} />}
                   </button>
                   <button onClick={() => handleShare(clip)}>
                     <Share2 size={15} />
@@ -192,39 +220,27 @@ export default function ClipsPage() {
         .clips-page {
           display: flex;
           flex-direction: column;
-          gap: 22px;
+          gap: clamp(18px, 3vw, 24px);
         }
 
         .clips-hero {
           display: flex;
-          align-items: flex-end;
+          align-items: flex-start;
           justify-content: space-between;
           gap: 20px;
-        }
-
-        .eyebrow {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          color: var(--accent-2);
-          font-size: 12px;
-          font-weight: 800;
-          letter-spacing: 0.12em;
-          text-transform: uppercase;
-          margin-bottom: 10px;
+          animation: fadeSlide 0.32s ease both;
         }
 
         h1 {
-          font-size: clamp(36px, 5vw, 56px);
+          font-size: clamp(32px, 5vw, 48px);
           line-height: 1;
+          margin-bottom: 6px;
         }
 
-        .clips-hero p,
-        .body p,
-        .empty-space p {
+        .clips-hero p {
           color: var(--muted);
-          margin-top: 8px;
-          line-height: 1.6;
+          line-height: 1.5;
+          max-width: 42ch;
         }
 
         .search-box,
@@ -254,8 +270,8 @@ export default function ClipsPage() {
         }
 
         .search-box {
-          width: min(100%, 360px);
-          min-height: 46px;
+          width: min(100%, 280px);
+          min-height: 40px;
           border-radius: 12px;
           padding: 0 13px;
           display: flex;
@@ -277,6 +293,7 @@ export default function ClipsPage() {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
           gap: 16px;
+          animation: fadeSlide 0.32s ease both;
         }
 
         .clip-card {
@@ -328,12 +345,12 @@ export default function ClipsPage() {
         }
 
         .body {
-          padding: 15px;
+          padding: 14px;
         }
 
         .body h3 {
-          min-height: 40px;
-          font-size: 15px;
+          min-height: 38px;
+          font-size: 14px;
           line-height: 1.35;
           display: -webkit-box;
           -webkit-line-clamp: 2;
@@ -341,17 +358,10 @@ export default function ClipsPage() {
           overflow: hidden;
         }
 
-        .body p {
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          font-size: 12px;
-        }
-
         .actions {
           display: flex;
           gap: 8px;
-          margin-top: 14px;
+          margin-top: 12px;
         }
 
         .actions button {
@@ -368,6 +378,7 @@ export default function ClipsPage() {
           font-size: 12px;
           font-weight: 750;
           cursor: pointer;
+          touch-action: manipulation;
         }
 
         .actions button:first-child {
@@ -381,7 +392,7 @@ export default function ClipsPage() {
         }
 
         .empty-space {
-          min-height: 420px;
+          min-height: 380px;
           border-radius: 20px;
           display: flex;
           flex-direction: column;
@@ -392,19 +403,153 @@ export default function ClipsPage() {
           color: var(--muted);
         }
 
-        .empty-space h2 {
-          color: #ffffff;
-          font-size: 24px;
+        .clip-skeleton {
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 18px;
+          overflow: hidden;
+          background: rgba(10, 13, 22, 0.78);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 18px 60px rgba(0, 0, 0, 0.22);
         }
 
-        @media (max-width: 820px) {
+        .skeleton-preview {
+          aspect-ratio: 9 / 16;
+        }
+
+        .skeleton-body {
+          padding: 14px;
+          display: grid;
+          gap: 10px;
+        }
+
+        .skeleton-line,
+        .skeleton-button,
+        .skeleton-square {
+          display: block;
+          border-radius: 999px;
+          height: 12px;
+        }
+
+        .skeleton-line.wide {
+          width: 82%;
+        }
+
+        .skeleton-line.short {
+          width: 52%;
+          opacity: 0.72;
+        }
+
+        .skeleton-actions {
+          display: flex;
+          gap: 8px;
+          margin-top: 4px;
+        }
+
+        .skeleton-button {
+          flex: 1;
+          height: 34px;
+          border-radius: 10px;
+        }
+
+        .skeleton-square {
+          width: 38px;
+          height: 34px;
+          border-radius: 10px;
+        }
+
+        .shimmer {
+          position: relative;
+          overflow: hidden;
+          background: rgba(255, 255, 255, 0.075);
+        }
+
+        .shimmer::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          transform: translateX(-100%);
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.13), transparent);
+          animation: shimmer 1.35s ease-in-out infinite;
+        }
+
+        .empty-space h2 {
+          color: #ffffff;
+          font-size: 22px;
+        }
+
+        .start-link {
+          margin-top: 8px;
+          min-height: 40px;
+          border-radius: 10px;
+          padding: 0 16px;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          background: rgba(255, 255, 255, 0.08);
+          color: #ffffff;
+          text-decoration: none;
+          font-size: 13px;
+          font-weight: 700;
+        }
+
+        .start-link:hover {
+          background: rgba(255, 255, 255, 0.12);
+        }
+
+        @media (max-width: 640px) {
           .clips-hero {
-            align-items: stretch;
             flex-direction: column;
+            align-items: stretch;
+            gap: 14px;
           }
 
           .search-box {
             width: 100%;
+            min-height: 44px;
+          }
+
+          .clip-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+          }
+
+          .body {
+            padding: 12px;
+          }
+
+          .actions {
+            gap: 6px;
+          }
+
+          .actions button {
+            min-height: 38px;
+            padding: 0 9px;
+          }
+
+          .actions button:first-child {
+            min-width: 0;
+          }
+        }
+
+        @media (max-width: 420px) {
+          .clip-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+
+        @keyframes fadeSlide {
+          from {
+            opacity: 0;
+            transform: translateY(8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes shimmer {
+          to {
+            transform: translateX(100%);
           }
         }
       `}</style>
