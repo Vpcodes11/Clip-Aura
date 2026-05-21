@@ -619,12 +619,12 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             }
             .play-button-large {
               width: 56px; height: 56px;
-              background: rgba(139, 92, 246, 0.8);
+              background: rgba(124, 58, 237, 0.8);
               border: none; border-radius: 50%;
               display: flex; align-items: center; justify-content: center;
               cursor: pointer;
               transition: 0.2s ease-in-out;
-              box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+              box-shadow: 0 0 20px rgba(124, 58, 237, 0.4);
             }
             .play-button-large:hover {
               transform: scale(1.05);
@@ -714,9 +714,9 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               border-color: rgba(255, 255, 255, 0.12);
             }
             .stealth-input-field:focus, .stealth-select:focus {
-              border-color: rgba(139, 92, 246, 0.5);
+              border-color: rgba(124, 58, 237, 0.5);
               background: rgba(255, 255, 255, 0.02);
-              box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+              box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.2);
               transform: translateY(-1px);
             }
 
@@ -762,9 +762,9 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
             }
             .word-card.active {
-              background: rgba(139, 92, 246, 0.06);
-              border-color: rgba(139, 92, 246, 0.6);
-              box-shadow: 0 0 16px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+              background: rgba(124, 58, 237, 0.06);
+              border-color: rgba(124, 58, 237, 0.6);
+              box-shadow: 0 0 16px rgba(124, 58, 237, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
             }
             .word-timestamp {
               font-size: 10px;
@@ -790,8 +790,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             }
             .word-input:focus {
               background: rgba(0, 0, 0, 0.4);
-              border-color: rgba(139, 92, 246, 0.5);
-              box-shadow: 0 0 8px rgba(139, 92, 246, 0.15);
+              border-color: rgba(124, 58, 237, 0.5);
+              box-shadow: 0 0 8px rgba(124, 58, 237, 0.15);
             }
             .transcript-footer {
               padding: 16px 20px;
@@ -849,12 +849,12 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             .safe-zone-toggle:hover {
               background: rgba(10, 13, 22, 0.85);
               color: #ffffff;
-              border-color: rgba(246, 92, 139, 0.3);
+              border-color: rgba(124, 58, 237, 0.3);
             }
             .safe-zone-toggle.active {
-              background: rgba(246, 92, 139, 0.15);
-              border-color: rgba(246, 92, 139, 0.4);
-              color: #f65c8b;
+              background: rgba(124, 58, 237, 0.15);
+              border-color: rgba(124, 58, 237, 0.4);
+              color: #7c3aed;
             }
 
             .tiktok-safe-overlay {
@@ -912,7 +912,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               width: 100%;
               height: 100%;
               border-radius: 50%;
-              background: #f65c8b;
+              background: #7c3aed;
               border: 1px solid #ffffff;
             }
             .avatar-plus {
@@ -1011,11 +1011,11 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               transition: background 0.1s ease, transform 0.1s ease;
             }
             .waveform-bar.active {
-              background: linear-gradient(to top, #8b5cf6, #f65c8b);
+              background: linear-gradient(to top, #7c3aed, #7c3aed);
             }
             .waveform-bar.active.spoken {
-              background: linear-gradient(to top, #f65c8b, #ff7b9f);
-              box-shadow: 0 0 8px rgba(246, 92, 139, 0.4);
+              background: linear-gradient(to top, #7c3aed, #ff7b9f);
+              box-shadow: 0 0 8px rgba(124, 58, 237, 0.4);
             }
             .waveform-visualizer:hover .waveform-bar {
               transform: scaleY(1.05);
@@ -1029,12 +1029,12 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               padding: 4px 0;
             }
             .word-card.editing {
-              border-color: rgba(246, 92, 139, 0.5);
+              border-color: rgba(124, 58, 237, 0.5);
               background: rgba(0, 0, 0, 0.4);
             }
             .word-input-edit {
-              background: rgba(246, 92, 139, 0.08);
-              border: 1px solid rgba(246, 92, 139, 0.3);
+              background: rgba(124, 58, 237, 0.08);
+              border: 1px solid rgba(124, 58, 237, 0.3);
               border-radius: 6px;
               color: #ffffff;
               font-size: 14px;
@@ -1046,8 +1046,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               transition: all 0.2s ease;
             }
             .word-input-edit:focus {
-              box-shadow: 0 0 8px rgba(246, 92, 139, 0.3);
-              border-color: #f65c8b;
+              box-shadow: 0 0 8px rgba(124, 58, 237, 0.3);
+              border-color: #7c3aed;
             }
 
             .export-trigger-btn {
@@ -1063,8 +1063,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               transition: all 0.2s ease;
             }
             .export-trigger-btn:hover {
-              background: rgba(246, 92, 139, 0.1);
-              border-color: rgba(246, 92, 139, 0.3);
+              background: rgba(124, 58, 237, 0.1);
+              border-color: rgba(124, 58, 237, 0.3);
               color: #ffffff;
             }
           `}</style>

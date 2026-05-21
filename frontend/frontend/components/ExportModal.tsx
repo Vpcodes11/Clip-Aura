@@ -283,15 +283,15 @@ Generated with ClipAura ✨`;
               width: 42px;
               height: 42px;
               border-radius: 12px;
-              background: rgba(246, 92, 139, 0.12);
-              border: 1px solid rgba(246, 92, 139, 0.25);
+              background: rgba(124, 58, 237, 0.12);
+              border: 1px solid rgba(124, 58, 237, 0.25);
               display: flex;
               align-items: center;
               justify-content: center;
             }
 
             .text-accent {
-              color: #f65c8b;
+              color: #7c3aed;
             }
 
             .export-header h2 {
@@ -387,7 +387,7 @@ Generated with ClipAura ✨`;
               position: absolute;
               inset: -2px;
               border-radius: 18px;
-              background: linear-gradient(135deg, #f65c8b, #8b5cf6);
+              background: linear-gradient(135deg, #7c3aed, #7c3aed);
               z-index: -1;
               opacity: 0.25;
               filter: blur(8px);
@@ -438,14 +438,14 @@ Generated with ClipAura ✨`;
               text-decoration: none;
               cursor: pointer;
               border: 0;
-              background: linear-gradient(135deg, #f65c8b, #8b5cf6);
+              background: linear-gradient(135deg, #7c3aed, #7c3aed);
               color: #ffffff;
               transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             }
 
             .download-btn:hover {
               transform: translateY(-1px);
-              box-shadow: 0 8px 24px rgba(246, 92, 139, 0.25);
+              box-shadow: 0 8px 24px rgba(124, 58, 237, 0.25);
             }
 
             .download-btn:disabled {
@@ -507,9 +507,9 @@ Generated with ClipAura ✨`;
             }
 
             .hook-val {
-              border-color: rgba(246, 92, 139, 0.15);
-              background: rgba(246, 92, 139, 0.02);
-              color: #f65c8b;
+              border-color: rgba(124, 58, 237, 0.15);
+              background: rgba(124, 58, 237, 0.02);
+              color: #7c3aed;
               font-weight: 700;
             }
 
@@ -526,8 +526,8 @@ Generated with ClipAura ✨`;
               min-height: 46px;
               border: none;
               border-radius: 12px;
-              background: linear-gradient(135deg, rgba(246, 92, 139, 0.15), rgba(139, 92, 246, 0.15));
-              border: 1px solid rgba(246, 92, 139, 0.25);
+              background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(124, 58, 237, 0.15));
+              border: 1px solid rgba(124, 58, 237, 0.25);
               color: #ffffff;
               font-size: 13px;
               font-weight: 750;
@@ -540,10 +540,10 @@ Generated with ClipAura ✨`;
             }
 
             .copy-package-btn:hover {
-              background: linear-gradient(135deg, rgba(246, 92, 139, 0.22), rgba(139, 92, 246, 0.22));
-              border-color: rgba(246, 92, 139, 0.4);
+              background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(124, 58, 237, 0.22));
+              border-color: rgba(124, 58, 237, 0.4);
               transform: translateY(-1px);
-              box-shadow: 0 4px 20px rgba(246, 92, 139, 0.12);
+              box-shadow: 0 4px 20px rgba(124, 58, 237, 0.12);
             }
 
             .text-amber {
