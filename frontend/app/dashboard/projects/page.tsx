@@ -1,7 +1,3 @@
-"use client";
-
-import { Sparkles } from "lucide-react";
-
 export default function ComingSoon() {
   return (
     <div className="flex flex-col items-center justify-center h-[60vh] gap-6 text-center">

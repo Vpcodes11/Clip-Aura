@@ -3,7 +3,7 @@ import subprocess
 import os
 import json
 import functools
-from app.config import TARGET_WIDTH, TARGET_HEIGHT, CAPTION_STYLES, DEFAULT_CAPTION_STYLE, PRESETS
+from app.config import CAPTION_STYLES, DEFAULT_CAPTION_STYLE, PRESETS
 from app.core.face_processor import tracker
 
 
@@ -270,3 +270,28 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
         raise RuntimeError(f"FFmpeg failed: {result.stderr[-500:]}")
 
     return output_path
+
+
+def safe_create_clip(video_path, clip_info, words, output_path, clip_index,
+                     progress_callback=None, caption_style=None, preset="tiktok", is_pro=False):
+    """
+    Fault-tolerant wrapper around create_clip.
+    Returns a result dict: {"ok": True, "attempt": "dynamic"} on success,
+    or {"ok": False, "error": str} on failure — so the worker can continue
+    rendering remaining clips even if one fails.
+    """
+    try:
+        create_clip(
+            video_path=video_path,
+            clip_info=clip_info,
+            words=words,
+            output_path=output_path,
+            clip_index=clip_index,
+            progress_callback=progress_callback,
+            caption_style=caption_style,
+            preset=preset,
+            is_pro=is_pro,
+        )
+        return {"ok": True, "attempt": "dynamic"}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}

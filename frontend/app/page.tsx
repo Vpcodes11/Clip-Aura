@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion, Variants } from "framer-motion";
 import { Upload, Zap, BarChart3, Shield, Play, ArrowRight } from "lucide-react";
 
@@ -37,8 +38,8 @@ export default function Home() {
             Identify hooks, reframe content, and deploy viral assets in seconds.
           </p>
           <div className="hero-actions">
-            <button className="glow-button">Get Early Access</button>
-            <button className="secondary-btn">Watch the System <Play size={14} /></button>
+            <Link className="glow-button" href="/dashboard">Get Early Access</Link>
+            <Link className="secondary-btn" href="/dashboard/clips">Watch the System <Play size={14} /></Link>
           </div>
         </motion.div>
       </section>
@@ -75,7 +76,7 @@ export default function Home() {
             <div className="bento-icon"><Upload size={24} /></div>
             <h3>Instant Deployment</h3>
             <p>Seamlessly export directly to TikTok, Reels, and Shorts with a single click.</p>
-            <button className="bento-btn">Try Upload <ArrowRight size={14} /></button>
+            <Link className="bento-btn" href="/dashboard">Try Upload <ArrowRight size={14} /></Link>
           </motion.div>
         </motion.div>
       </section>

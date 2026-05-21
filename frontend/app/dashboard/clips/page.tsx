@@ -31,23 +31,31 @@ export default function ClipsPage() {
   const [query, setQuery] = useState("");
   const [activeEditorClip, setActiveEditorClip] = useState<{ jobId: string; clip: Clip; clipIndex: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [shareMessage, setShareMessage] = useState<string | null>(null);
 
   const fetchJobs = React.useCallback(async () => {
+    setError(null);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await authenticatedFetch(`${apiUrl}/api/jobs`);
-      if (res.ok) setJobs(await res.json());
+      if (!res.ok) throw new Error("Could not load generated clips.");
+      setJobs(await res.json());
     } catch (err) {
       console.error("Failed to fetch clips:", err);
+      setError(err instanceof Error ? err.message : "Could not load generated clips.");
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  React.useEffect(() => {
-    fetchJobs();
+  React.useLayoutEffect(() => {
+    const id = setTimeout(() => fetchJobs(), 0);
     const interval = setInterval(fetchJobs, 12000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(id);
+      clearInterval(interval);
+    };
   }, [fetchJobs]);
 
   const clips = useMemo<ClipWithJob[]>(
@@ -70,6 +78,28 @@ export default function ClipsPage() {
   });
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  const handleShare = async (clip: ClipWithJob) => {
+    const previewUrl = `${apiUrl}/api/preview/${clip.jobId}/${clip.filename}`;
+    setShareMessage(null);
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: clip.title,
+          text: clip.hook_caption || clip.title,
+          url: previewUrl,
+        });
+        setShareMessage("Share sheet opened.");
+      } else {
+        await navigator.clipboard.writeText(previewUrl);
+        setShareMessage("Clip link copied.");
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      console.error("Failed to share clip:", err);
+      setShareMessage("Could not share this clip.");
+    }
+  };
 
   return (
     <div className="clips-page">
@@ -97,6 +127,12 @@ export default function ClipsPage() {
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search clips..." />
         </div>
       </section>
+
+      {(error || shareMessage) && (
+        <div className={`notice ${error ? "error" : ""}`}>
+          {error || shareMessage}
+        </div>
+      )}
 
       {isLoading && clips.length === 0 ? (
         <div className="empty-space">
@@ -142,7 +178,7 @@ export default function ClipsPage() {
                   <button onClick={() => window.open(`${apiUrl}/api/download/${clip.jobId}/${clip.filename}`)}>
                     <Download size={15} />
                   </button>
-                  <button>
+                  <button onClick={() => handleShare(clip)}>
                     <Share2 size={15} />
                   </button>
                 </div>
@@ -193,12 +229,28 @@ export default function ClipsPage() {
 
         .search-box,
         .clip-card,
-        .empty-space {
+        .empty-space,
+        .notice {
           border: 1px solid rgba(255, 255, 255, 0.1);
           background: rgba(10, 13, 22, 0.78);
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 18px 60px rgba(0, 0, 0, 0.22);
           backdrop-filter: blur(18px);
           -webkit-backdrop-filter: blur(18px);
+        }
+
+        .notice {
+          width: fit-content;
+          border-radius: 12px;
+          padding: 10px 13px;
+          color: var(--muted-strong);
+          font-size: 13px;
+          font-weight: 750;
+        }
+
+        .notice.error {
+          border-color: rgba(239, 68, 68, 0.22);
+          background: rgba(239, 68, 68, 0.08);
+          color: #fca5a5;
         }
 
         .search-box {

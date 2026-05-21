@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -60,14 +60,22 @@ export default function Dashboard() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "complete" | "error">("all");
+
+  const hasActiveRef = useRef(false);
 
   const fetchJobs = React.useCallback(async () => {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await authenticatedFetch(`${apiUrl}/api/jobs`);
-      if (res.ok) setJobs(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setJobs(data);
+        hasActiveRef.current = data.some((job: Job) => activeStatuses.includes(job.status));
+      }
     } catch (err) {
       console.error("Failed to fetch projects:", err);
     } finally {
@@ -75,21 +83,33 @@ export default function Dashboard() {
     }
   }, []);
 
-  React.useEffect(() => {
-    fetchJobs();
-    const hasActive = jobs.some((job) => activeStatuses.includes(job.status));
-    const interval = setInterval(fetchJobs, hasActive ? 3000 : 12000);
-    return () => clearInterval(interval);
-  }, [fetchJobs, jobs]);
+  React.useLayoutEffect(() => {
+    const id = setTimeout(() => fetchJobs(), 0);
+    const interval = setInterval(() => {
+      if (hasActiveRef.current) {
+        fetchJobs();
+      }
+    }, 3000);
+    return () => {
+      clearTimeout(id);
+      clearInterval(interval);
+    };
+  }, [fetchJobs]);
 
   const handleDeleteJob = async (jobId: string) => {
     if (!confirm("Delete this project and all generated clips?")) return;
+    setDeletingJobId(jobId);
+    setActionError(null);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const res = await authenticatedFetch(`${apiUrl}/api/job/${jobId}`, { method: "DELETE" });
-      if (res.ok) setJobs((prev) => prev.filter((job) => job.id !== jobId));
+      if (!res.ok) throw new Error("Could not delete project. Please try again.");
+      setJobs((prev) => prev.filter((job) => job.id !== jobId));
     } catch (err) {
       console.error("Failed to delete project:", err);
+      setActionError(err instanceof Error ? err.message : "Could not delete project. Please try again.");
+    } finally {
+      setDeletingJobId(null);
     }
   };
 
@@ -113,7 +133,7 @@ export default function Dashboard() {
 
   return (
     <div className="clean-dashboard">
-      <UploadModal isOpen={isUploadOpen} onClose={() => setIsUploadOpen(false)} />
+      <UploadModal isOpen={isUploadOpen} onClose={() => setIsUploadOpen(false)} onUploadStarted={fetchJobs} />
 
       <section className="dashboard-hero">
         <div>
@@ -166,6 +186,7 @@ export default function Dashboard() {
           <div>
             <h2>Project queue</h2>
             <p>One row per source video. Error details stay collapsed so the queue stays readable.</p>
+            {actionError && <div className="inline-error">{actionError}</div>}
           </div>
           <div className="toolbar">
             <div className="search-box">
@@ -230,8 +251,8 @@ export default function Dashboard() {
                 </div>
                 <div className="row-actions">
                   {job.status === "complete" && <Link href="/dashboard/clips">View clips</Link>}
-                  <button onClick={() => handleDeleteJob(job.id)} title="Delete project">
-                    <Trash2 size={15} />
+                  <button onClick={() => handleDeleteJob(job.id)} title="Delete project" disabled={deletingJobId === job.id}>
+                    {deletingJobId === job.id ? <Loader2 className="spin" size={15} /> : <Trash2 size={15} />}
                   </button>
                 </div>
               </article>
@@ -276,6 +297,18 @@ export default function Dashboard() {
           color: var(--muted);
           margin-top: 8px;
           line-height: 1.6;
+        }
+
+        .inline-error {
+          width: fit-content;
+          margin-top: 12px;
+          border: 1px solid rgba(239, 68, 68, 0.22);
+          border-radius: 10px;
+          padding: 9px 11px;
+          background: rgba(239, 68, 68, 0.08);
+          color: #fca5a5;
+          font-size: 13px;
+          font-weight: 700;
         }
 
         .primary-action,

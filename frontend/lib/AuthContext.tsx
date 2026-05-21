@@ -12,6 +12,32 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
+const isDevMode = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+
+function buildDevSession(): { user: User; session: Session } {
+  const devUser: User = {
+    id: 'dev-architect-id',
+    aud: 'authenticated',
+    role: 'authenticated',
+    email: 'dev@clipaura.local',
+    app_metadata: {},
+    user_metadata: { full_name: 'Dev Architect' },
+    created_at: '2026-01-01T00:00:00Z',
+  } as User;
+  const devSession: Session = {
+    provider_token: undefined,
+    provider_refresh_token: undefined,
+    access_token: 'dev-token',
+    refresh_token: 'dev-refresh-token',
+    expires_in: 3600,
+    token_type: 'bearer',
+    user: devUser,
+  };
+  return { user: devUser, session: devSession };
+}
+
+const devSessionData = isDevMode ? buildDevSession() : null;
+
 const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
@@ -27,32 +53,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
-
+    
     if (isDevMode) {
-      console.log("🛠️ [DEV_MODE] Simulating Auth Session...");
-      const mockUser = {
-        id: 'dev-architect-id',
-        email: 'dev@clipaura.local',
-        user_metadata: { full_name: 'Dev Architect' }
-      } as any;
-      
-      setUser(mockUser);
-      setSession({ user: mockUser, access_token: 'dev-token' } as any);
+      const devSession = buildDevSession();
+      setUser(devSession.user);
+      setSession(devSession.session);
       setLoading(false);
       return;
     }
 
-    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
       setUser(session?.user ?? null);
+      setSession(session);
       setLoading(false);
     });
 
-    // Listen for changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
       setUser(session?.user ?? null);
+      setSession(session);
       setLoading(false);
 
       if (event === 'SIGNED_IN') {

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AuthProvider } from "@/lib/AuthContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -30,7 +31,9 @@ export default function RootLayout({
               </Link>
             </div>
           </nav>
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </AuthProvider>
       </body>
     </html>

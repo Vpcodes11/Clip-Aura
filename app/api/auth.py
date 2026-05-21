@@ -15,6 +15,11 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 security = HTTPBearer()
 
+def get_supabase_client() -> Client:
+    """Return the shared Supabase client instance."""
+    return supabase
+
+
 async def get_current_user(
     token: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)

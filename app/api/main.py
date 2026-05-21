@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import UPLOAD_DIR, OUTPUT_DIR, BASE_DIR, PRESETS, CAPTION_STYLES, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, STORAGE_MODE, DEV_MODE
@@ -134,6 +135,81 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 async def root():
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
     return RedirectResponse(url=frontend_url)
+
+
+@app.get("/api/health")
+async def health_check():
+    """Production health check: verifies API, DB, Redis, and Celery worker connectivity."""
+    import time
+    checks = {}
+
+    # 1. Database check
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        checks["database"] = "ok"
+    except Exception as e:
+        checks["database"] = {"error": str(e)[:200]}
+
+    # 2. Redis check
+    try:
+        await redis_async.ping()
+        checks["redis"] = "ok"
+    except Exception as e:
+        checks["redis"] = {"error": str(e)[:200]}
+
+    # 3. Celery worker check
+    try:
+        inspect = celery_app.control.inspect()
+        worker_stats = inspect.ping()
+        if worker_stats:
+            checks["celery"] = {"status": "ok", "workers": len(worker_stats)}
+        else:
+            checks["celery"] = {"status": "warning", "message": "No workers responded"}
+    except Exception as e:
+        checks["celery"] = {"status": "warning", "message": f"Inspect failed: {str(e)[:200]}"}
+
+    all_ok = all(
+        v == "ok" or (isinstance(v, dict) and v.get("status") == "ok")
+        for v in checks.values()
+    )
+
+    return JSONResponse({
+        "status": "healthy" if all_ok else "degraded",
+        "timestamp": time.time(),
+        "checks": checks,
+    })
+
+
+@app.get("/health/live")
+async def health_live():
+    """Liveness probe: the API process is running."""
+    return {"status": "ok"}
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """Readiness probe: required backing services are reachable."""
+    checks = {"database": "unknown", "redis": "unknown"}
+
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception as exc:
+        checks["database"] = f"error: {exc.__class__.__name__}"
+
+    try:
+        await redis_async.ping()
+        checks["redis"] = "ok"
+    except Exception as exc:
+        checks["redis"] = f"error: {exc.__class__.__name__}"
+
+    if any(value != "ok" for value in checks.values()):
+        raise HTTPException(status_code=503, detail={"status": "not_ready", "checks": checks})
+
+    return {"status": "ok", "checks": checks}
 
 
 @app.get("/api/me")
@@ -475,6 +551,58 @@ async def delete_job(job_id: str, db: Session = Depends(get_db), user: User = De
             shutil.rmtree(d, ignore_errors=True)
 
     return JSONResponse({'success': True})
+
+
+@app.post("/api/job/{job_id}/retry")
+async def retry_job(job_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Retry a failed or partially completed job from its latest durable checkpoint."""
+    job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    has_errors = bool(job.errors)
+    if job.status not in {"error", "complete"} or (job.status == "complete" and not has_errors):
+        raise HTTPException(status_code=409, detail="Only failed or partially completed jobs can be retried.")
+
+    job.errors = []
+    job.clips = []
+
+    if job.video_path:
+        if job.clip_candidates:
+            job.stage = "clips_rendering"
+            job.progress = 75
+            job.message = "Retrying clip rendering from saved candidates..."
+        elif job.transcript:
+            job.stage = "transcribed"
+            job.progress = 55
+            job.message = "Retrying analysis from saved transcript..."
+        else:
+            job.stage = "queued"
+            job.progress = 0
+            job.message = "Retrying processing from source video..."
+
+        job.status = "queued"
+        db.commit()
+        celery_app.send_task("tasks.process_video_job", args=[job_id])
+    elif job.source:
+        job.stage = "downloading"
+        job.status = "downloading"
+        job.progress = 0
+        job.message = "Retrying source download..."
+        db.commit()
+        job_dir = UPLOAD_DIR / job_id
+        job_dir.mkdir(parents=True, exist_ok=True)
+        celery_app.send_task("tasks.download_and_process_job", args=[job_id, job.source, str(job_dir)])
+    else:
+        raise HTTPException(status_code=409, detail="Job has no source video or URL to retry.")
+
+    await redis_async.publish(f"job_progress_{job_id}", json.dumps({
+        "type": "progress",
+        "message": job.message,
+        "progress": job.progress,
+    }))
+
+    return {"status": job.status, "stage": job.stage, "message": job.message}
 
 
 class WordUpdate(BaseModel):

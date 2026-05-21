@@ -8,9 +8,10 @@ import { authenticatedFetch } from '@/lib/supabase';
 interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onUploadStarted?: () => void;
 }
 
-export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
+export default function UploadModal({ isOpen, onClose, onUploadStarted }: UploadModalProps) {
   const [activeTab, setActiveTab] = useState<'upload' | 'url'>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState('');
@@ -52,11 +53,12 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
       
       const data = await response.json();
       console.log('Job started:', data.job_id);
+      onUploadStarted?.();
       onClose();
       // In a real app, we would redirect to the job status page
     } catch (error) {
       console.error(error);
-      alert('Failed to start intelligence pipeline.');
+      setError(error instanceof Error ? error.message : 'Failed to start intelligence pipeline.');
     } finally {
       setIsUploading(false);
     }
@@ -83,19 +85,21 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
                 <Sparkles size={18} className="text-accent" />
                 <h2>New Video Project</h2>
               </div>
-              <button onClick={onClose} className="close-btn"><X size={20} /></button>
+              <button onClick={onClose} className="close-btn" disabled={isUploading}><X size={20} /></button>
             </div>
 
             <div className="modal-tabs">
               <button 
                 className={`modal-tab ${activeTab === 'upload' ? 'active' : ''}`}
                 onClick={() => handleTabChange('upload')}
+                disabled={isUploading}
               >
                 <Upload size={16} /> Upload Video
               </button>
               <button 
                 className={`modal-tab ${activeTab === 'url' ? 'active' : ''}`}
                 onClick={() => handleTabChange('url')}
+                disabled={isUploading}
               >
                 <LinkIcon size={16} /> Paste URL
               </button>
@@ -105,7 +109,7 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
               {activeTab === 'upload' ? (
                 <div 
                   className="drop-zone"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => !isUploading && fileInputRef.current?.click()}
                 >
                   <input 
                     type="file" 
@@ -116,6 +120,7 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
                       setError(null);
                     }}
                     style={{ display: 'none' }}
+                    disabled={isUploading}
                   />
                   {file ? (
                     <div className="file-selected">
@@ -141,6 +146,7 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
                       setError(null);
                     }}
                     className="stealth-input"
+                    disabled={isUploading}
                   />
                 </div>
               )}

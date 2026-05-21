@@ -2,13 +2,14 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   LayoutDashboard, 
   Video, 
   CreditCard, 
   Settings, 
   LogOut, 
+  Loader2,
   Sparkles 
 } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
@@ -19,11 +20,18 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { signOut, user } = useAuth();
+  const router = useRouter();
+  const { signOut, user, loading } = useAuth();
 
   const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
   const usageLimit = isDevMode ? 1000 : 15;
   const userInitial = user?.user_metadata?.full_name?.charAt(0) || user?.email?.charAt(0) || "U";
+
+  React.useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [loading, router, user]);
 
   const navItems = [
     { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
@@ -31,6 +39,15 @@ export default function DashboardLayout({
     { name: "Usage", href: "/dashboard/billing", icon: CreditCard },
     { name: "System", href: "/dashboard/settings", icon: Settings },
   ];
+
+  if (loading || !user) {
+    return (
+      <div className="dashboard-gate">
+        <Loader2 className="spin" size={22} />
+        <span>{loading ? "Loading workspace..." : "Redirecting..."}</span>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-wrapper">
