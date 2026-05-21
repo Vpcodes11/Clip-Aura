@@ -674,6 +674,10 @@ button:disabled {
 .logout:hover {
   color: #fecaca;
   background: rgba(239, 68, 68, 0.08);
+
+.mobile-logout {
+  display: none;
+}
 }
 
 /* Reusable dashboard surfaces */
@@ -791,6 +795,9 @@ input {
 
   .nav-item {
     flex: 0 0 auto;
+  }
+  .mobile-logout {
+    display: flex;
   }
 
   .top-header {
