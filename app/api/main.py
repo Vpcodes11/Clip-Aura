@@ -223,6 +223,12 @@ async def download_clip(job_id: str, filename: str, user: User = Depends(get_cur
             return RedirectResponse(url)
     
     filepath = OUTPUT_DIR / job_id / filename
+    try:
+        if not filepath.resolve().is_relative_to(OUTPUT_DIR.resolve()):
+            return JSONResponse({'error': 'Invalid path'}, status_code=400)
+    except Exception:
+        return JSONResponse({'error': 'Invalid path'}, status_code=400)
+
     if not filepath.exists():
         return JSONResponse({'error': 'File not found'}, status_code=404)
     return FileResponse(str(filepath), filename=filename, media_type='video/mp4')
@@ -237,6 +243,12 @@ async def preview_clip(job_id: str, filename: str):
             return RedirectResponse(url)
 
     filepath = OUTPUT_DIR / job_id / filename
+    try:
+        if not filepath.resolve().is_relative_to(OUTPUT_DIR.resolve()):
+            return JSONResponse({'error': 'Invalid path'}, status_code=400)
+    except Exception:
+        return JSONResponse({'error': 'Invalid path'}, status_code=400)
+
     if not filepath.exists():
         return JSONResponse({'error': 'File not found'}, status_code=404)
 
