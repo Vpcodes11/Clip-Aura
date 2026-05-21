@@ -11,6 +11,7 @@ export interface Clip {
   virality_score: number;
   duration?: string | number;
   hook_caption?: string;
+  preview_url?: string;
   reason?: string;
   category?: string;
   hashtags?: string[] | string;
@@ -24,13 +25,15 @@ interface ExportModalProps {
   jobId: string;
   clip: Clip | null;
   clipIndex: number;
+  previewVersion?: number;
 }
 
-export default function ExportModal({ isOpen, onClose, jobId, clip, clipIndex }: ExportModalProps) {
+export default function ExportModal({ isOpen, onClose, jobId, clip, clipIndex, previewVersion = 0 }: ExportModalProps) {
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
+  const [qrLoaded, setQrLoaded] = useState(false);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // Escape key closes modal
@@ -45,7 +48,9 @@ export default function ExportModal({ isOpen, onClose, jobId, clip, clipIndex }:
 
   if (!clip) return null;
 
-  const previewUrl = `${apiUrl}/api/preview/${jobId}/${clip.filename}`;
+  const previewUrl = clip.preview_url
+    ? (clip.preview_url.startsWith("http") ? clip.preview_url : `${apiUrl}${clip.preview_url}`)
+    : "";
   const downloadUrl = `${apiUrl}/api/download/${jobId}/${clip.filename}`;
   
   // Format hashtags properly
@@ -157,7 +162,8 @@ Generated with ClipAura ✨`;
 
                 <div className="qr-container">
                   <div className="qr-frame">
-                    <img src={qrCodeUrl} alt="Scan QR Code to save on mobile" className="qr-image" />
+                    {!qrLoaded && <div className="qr-placeholder"><Loader2 className="spin" size={24} /></div>}
+                    <img src={qrCodeUrl} alt="QR code to download video on mobile" className="qr-image" onLoad={() => setQrLoaded(true)} onError={() => setQrLoaded(true)} style={{ display: qrLoaded ? 'block' : 'none' }} />
                     <div className="qr-glow" />
                   </div>
                   <div className="qr-instructions">
@@ -370,6 +376,7 @@ Generated with ClipAura ✨`;
 
             .qr-frame {
               position: relative;
+              position: relative;
               background: #ffffff;
               padding: 12px;
               border-radius: 16px;
@@ -381,6 +388,15 @@ Generated with ClipAura ✨`;
               display: block;
               width: 140px;
               height: 140px;
+            }
+
+            .qr-placeholder {
+              width: 140px;
+              height: 140px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: var(--muted);
             }
 
             .qr-glow {

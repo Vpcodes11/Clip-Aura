@@ -1,10 +1,13 @@
 """Clip Aura — AI Video Clipper | FastAPI Server"""
 import asyncio
+import hashlib
+import hmac
 import os
 import uuid
 import shutil
 import json
 import socket
+import time
 import urllib.parse
 import ipaddress
 import re
@@ -20,7 +23,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.config import UPLOAD_DIR, OUTPUT_DIR, BASE_DIR, PRESETS, CAPTION_STYLES, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, STORAGE_MODE, DEV_MODE
+from app.config import UPLOAD_DIR, OUTPUT_DIR, BASE_DIR, PRESETS, CAPTION_STYLES, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, STORAGE_MODE, DEV_MODE, S3_SECRET_KEY, STRIPE_WEBHOOK_SECRET
 from app.api.database import engine, Base, get_db, SessionLocal
 from app.api.models import Job, User
 from app.api.schema_compat import ensure_job_columns
@@ -37,6 +40,7 @@ app = FastAPI(title="Clip Aura — AI Video Clipper")
 
 # Security Constraints
 ALLOWED_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm'}
+PREVIEW_URL_TTL_SECONDS = 15 * 60
 
 
 def resolve_job_file(directory: Path, filename: str) -> Path:
@@ -50,6 +54,69 @@ def resolve_job_file(directory: Path, filename: str) -> Path:
     if base not in filepath.parents:
         raise HTTPException(status_code=400, detail="Invalid filename")
     return filepath
+
+
+def get_preview_signing_secret() -> bytes:
+    secret = (
+        os.getenv("PREVIEW_SIGNING_SECRET")
+        or S3_SECRET_KEY
+        or STRIPE_WEBHOOK_SECRET
+    )
+    if not secret:
+        if DEV_MODE:
+            secret = "dev-preview-signing-secret"
+        else:
+            raise HTTPException(status_code=503, detail="Preview signing is not configured.")
+    return secret.encode("utf-8")
+
+
+def sign_preview_url(job_id: str, filename: str, expires_at: Optional[int] = None) -> str:
+    safe_name = os.path.basename(filename)
+    if safe_name != filename or not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    exp = expires_at or int(time.time()) + PREVIEW_URL_TTL_SECONDS
+    payload = f"{job_id}:{safe_name}:{exp}".encode("utf-8")
+    sig = hmac.new(get_preview_signing_secret(), payload, hashlib.sha256).hexdigest()
+    return f"/api/preview/{job_id}/{urllib.parse.quote(safe_name)}?exp={exp}&sig={sig}"
+
+
+def verify_preview_signature(job_id: str, filename: str, exp: Optional[int], sig: Optional[str]) -> None:
+    if not exp or not sig:
+        raise HTTPException(status_code=403, detail="Missing preview signature.")
+    if exp < int(time.time()):
+        raise HTTPException(status_code=403, detail="Preview link expired.")
+    expected = sign_preview_url(job_id, filename, exp).split("sig=", 1)[1]
+    if not hmac.compare_digest(expected, sig):
+        raise HTTPException(status_code=403, detail="Invalid preview signature.")
+
+
+def add_preview_urls(job_id: str, clips):
+    enriched = []
+    for clip in clips or []:
+        if isinstance(clip, dict) and clip.get("filename"):
+            enriched.append({**clip, "preview_url": sign_preview_url(job_id, clip["filename"])})
+        else:
+            enriched.append(clip)
+    return enriched
+
+
+def serialize_job(job: Job) -> dict:
+    return {
+        "id": job.id,
+        "user_id": job.user_id,
+        "status": job.status,
+        "stage": job.stage,
+        "progress": job.progress,
+        "message": job.message,
+        "source": job.source,
+        "provider": job.provider,
+        "preset": job.preset,
+        "caption_style": job.caption_style,
+        "clips": add_preview_urls(job.id, job.clips),
+        "errors": job.errors or [],
+        "transcript": job.transcript,
+        "created_at": job.created_at,
+    }
 
 
 def sanitize_filename(filename: str) -> str:
@@ -460,7 +527,7 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str, token: str = Non
 async def get_my_jobs(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """List all jobs for the current user"""
     jobs = db.query(Job).filter(Job.user_id == user.id).order_by(Job.created_at.desc()).all()
-    return jobs
+    return [serialize_job(job) for job in jobs]
 
 
 @app.get("/api/status/{job_id}")
@@ -474,10 +541,28 @@ async def get_status(job_id: str, db: Session = Depends(get_db), user: User = De
         'stage': job.stage,
         'progress': job.progress,
         'message': job.message,
-        'clips': job.clips or [],
+        'clips': add_preview_urls(job.id, job.clips),
         'transcript': job.transcript,
         'errors': job.errors or [],
     })
+
+
+@app.get("/api/preview-url/{job_id}/{filename}")
+async def get_preview_url(job_id: str, filename: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Return a short-lived signed preview URL after validating ownership."""
+    safe_name = os.path.basename(filename)
+    if safe_name != filename or not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    clip_names = {clip.get("filename") for clip in (job.clips or []) if isinstance(clip, dict)}
+    if safe_name not in clip_names:
+        raise HTTPException(status_code=404, detail="Clip not found")
+
+    return {"preview_url": sign_preview_url(job_id, safe_name)}
 
 
 
@@ -508,15 +593,22 @@ async def download_clip(job_id: str, filename: str, db: Session = Depends(get_db
     filepath = resolve_job_file(OUTPUT_DIR / job_id, safe_name)
     if not filepath.exists():
         return JSONResponse({'error': 'File not found'}, status_code=404)
-    return FileResponse(str(filepath), filename=safe_name, media_type='video/mp4')
+    return FileResponse(
+        str(filepath),
+        filename=safe_name,
+        media_type='video/mp4',
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 @app.get("/api/preview/{job_id}/{filename}")
-async def preview_clip(job_id: str, filename: str):
+async def preview_clip(job_id: str, filename: str, exp: Optional[int] = None, sig: Optional[str] = None):
     """Stream clip for in-browser preview (No auth required for simple preview)"""
     safe_name = os.path.basename(filename)
     if safe_name != filename or not safe_name:
         raise HTTPException(status_code=400, detail="Invalid filename")
+
+    verify_preview_signature(job_id, safe_name, exp, sig)
 
     redirect = _cloud_redirect(job_id, safe_name)
     if redirect:
@@ -532,7 +624,11 @@ async def preview_clip(job_id: str, filename: str):
     elif filename.endswith('.png'):
         media_type = 'image/png'
 
-    return FileResponse(str(filepath), media_type=media_type)
+    return FileResponse(
+        str(filepath),
+        media_type=media_type,
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 @app.delete("/api/job/{job_id}")
@@ -627,24 +723,23 @@ async def regenerate_clip_in_background(
     job_id: str, filename: str, words_list: list, caption_style: str, preset: str, is_pro: bool, title: str, hook_caption: str
 ):
     db = SessionLocal()
+    temp_output_path = None
     try:
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job:
             return
             
-        # Update clip info in database
-        updated_clips = []
         target_clip = None
         for clip in (job.clips or []):
             if clip['filename'] == filename:
-                clip['title'] = title
-                clip['hook_caption'] = hook_caption
-                clip['words'] = words_list
-                target_clip = clip
-            updated_clips.append(clip)
-            
-        job.clips = updated_clips
+                target_clip = dict(clip)
+                break
+
+        if not target_clip:
+            raise RuntimeError("Clip no longer exists.")
+
         job.status = 'processing' # Set to processing so the UI shows regeneration status
+        job.stage = "clip_regenerating"
         job.message = f"Regenerating captions for {title}..."
         db.commit()
         
@@ -655,12 +750,11 @@ async def regenerate_clip_in_background(
             'progress': 90
         }))
         
-        if not target_clip:
-            return
-            
-        # Re-run create_clip to overwrite the existing file
+        # Re-run create_clip to a temp file first; commit metadata only after replacement succeeds.
         video_path = job.video_path
         output_path = os.path.join(OUTPUT_DIR, job_id, filename)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        temp_output_path = f"{output_path}.tmp-{uuid.uuid4().hex}.mp4"
         
         clip_info = {
             'start_time': target_clip['start_time'],
@@ -678,7 +772,7 @@ async def regenerate_clip_in_background(
                 video_path=video_path,
                 clip_info=clip_info,
                 words=words_list,
-                output_path=output_path,
+                output_path=temp_output_path,
                 clip_index=int(filename.split('_')[-1].split('.')[0]) - 1,
                 progress_callback=None,
                 caption_style=caption_style,
@@ -686,11 +780,40 @@ async def regenerate_clip_in_background(
                 is_pro=is_pro
             )
         )
+
+        if not os.path.exists(temp_output_path) or os.path.getsize(temp_output_path) == 0:
+            raise RuntimeError("Regenerated clip file was not created.")
+
+        os.replace(temp_output_path, output_path)
+        temp_output_path = None
+
+        if STORAGE_MODE == "cloud":
+            uploaded = storage.upload_file(output_path, f"jobs/{job_id}/{filename}")
+            if not uploaded:
+                raise RuntimeError("Regenerated clip could not be uploaded to cloud storage.")
         
         # Mark job as complete again
         # Fetch fresh ref
         job = db.query(Job).filter(Job.id == job_id).first()
+        updated_clips = []
+        render_version = None
+        for clip in (job.clips or []):
+            if clip['filename'] == filename:
+                previous_version = int(clip.get('render_version') or 0)
+                render_version = previous_version + 1
+                updated_clips.append({
+                    **clip,
+                    'title': title,
+                    'hook_caption': hook_caption,
+                    'words': words_list,
+                    'render_version': render_version,
+                })
+            else:
+                updated_clips.append(clip)
+
+        job.clips = updated_clips
         job.status = 'complete'
+        job.stage = "complete"
         job.message = "Clip caption regeneration complete!"
         job.progress = 100
         db.commit()
@@ -699,19 +822,36 @@ async def regenerate_clip_in_background(
         await redis_async.publish(f"job_progress_{job_id}", json.dumps({
             'type': 'complete',
             'message': job.message,
-            'clips': job.clips,
+            'clips': add_preview_urls(job_id, job.clips),
             'transcript': job.transcript
         }))
         
     except Exception as e:
         print("CAPTION REGENT ERROR:", e)
-        # Attempt recovery to complete
+        if temp_output_path and os.path.exists(temp_output_path):
+            try:
+                os.remove(temp_output_path)
+            except OSError:
+                pass
+        # Failed edits must be visible as failures; do not commit edited metadata.
         try:
             job = db.query(Job).filter(Job.id == job_id).first()
             if job:
-                job.status = 'complete'
+                errors = list(job.errors or [])
+                errors.append({
+                    "stage": "edit_failed",
+                    "message": str(e)[:500],
+                })
+                job.errors = errors
+                job.status = 'error'
+                job.stage = 'edit_failed'
                 job.message = f"Failed to edit captions: {str(e)}"
+                job.progress = 100
                 db.commit()
+                await redis_async.publish(f"job_progress_{job_id}", json.dumps({
+                    'type': 'error',
+                    'message': job.message,
+                }))
         except Exception:
             pass
     finally:
@@ -731,6 +871,8 @@ async def edit_clip(
     job = db.query(Job).filter(Job.id == req.job_id, Job.user_id == user.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Project not found")
+    if job.status != "complete":
+        raise HTTPException(status_code=409, detail="This clip is already rendering. Wait for the current render to finish.")
         
     # Verify clip exists
     clips = job.clips or []
@@ -748,6 +890,20 @@ async def edit_clip(
     caption_style = req.caption_style or job.caption_style
     preset = req.preset or job.preset
     is_pro = user.subscription_tier == "pro"
+
+    updated = db.query(Job).filter(
+        Job.id == req.job_id,
+        Job.user_id == user.id,
+        Job.status == "complete",
+    ).update({
+        Job.status: 'processing',
+        Job.stage: "clip_regenerating",
+        Job.progress: max(job.progress or 0, 90),
+        Job.message: f"Regenerating captions for {req.title}...",
+    }, synchronize_session=False)
+    db.commit()
+    if not updated:
+        raise HTTPException(status_code=409, detail="This clip is already rendering. Wait for the current render to finish.")
     
     # Trigger background regeneration
     background_tasks.add_task(

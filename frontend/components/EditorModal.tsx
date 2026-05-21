@@ -18,6 +18,8 @@ export interface Clip {
   duration?: string | number;
   hook_caption?: string;
   words?: Word[];
+  preview_url?: string;
+  render_version?: number;
   start_time: number;
   end_time: number;
 }
@@ -30,6 +32,7 @@ interface EditorModalProps {
   clipIndex: number;
   onSaveSuccess: () => void;
   onExport?: () => void;
+  previewVersion?: number;
 }
 
 function getMockWords(clip: Clip): Word[] {
@@ -52,7 +55,7 @@ function getMockWords(clip: Clip): Word[] {
   return mockWords;
 }
 
-export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, onSaveSuccess, onExport }: EditorModalProps) {
+export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, onSaveSuccess, onExport, previewVersion = 0 }: EditorModalProps) {
   const [words, setWords] = useState<Word[]>(() => {
     if (!clip) return [];
     if (clip.words && clip.words.length > 0) {
@@ -76,6 +79,9 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const previewSrc = clip?.preview_url
+    ? (clip.preview_url.startsWith('http') ? clip.preview_url : `${apiUrl}${clip.preview_url}`)
+    : '';
 
   // Video synchronization effects
   useEffect(() => {
@@ -145,11 +151,20 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update clip parameters');
+        let message = 'Failed to update clip parameters';
+        try {
+          const errorBody = await response.json();
+          message = errorBody.detail || message;
+        } catch {
+          // Keep the generic message when the API does not return JSON.
+        }
+        throw new Error(message);
       }
 
       // Start polling to wait for the job status to become complete
+      let attempts = 0;
       const pollTimer = setInterval(async () => {
+        attempts += 1;
         try {
           const statusRes = await authenticatedFetch(`${apiUrl}/api/status/${jobId}`);
           if (statusRes.ok) {
@@ -164,6 +179,11 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               setIsSaving(false);
               setErrorMessage('Render failed. Please try again.');
             }
+          }
+          if (attempts >= 90) {
+            clearInterval(pollTimer);
+            setIsSaving(false);
+            setErrorMessage('Render is taking longer than expected. Refresh this project before trying again.');
           }
         } catch (err) {
           console.error('Polling error:', err);
@@ -231,7 +251,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                 >
                   <video 
                     ref={videoRef}
-                    src={`${apiUrl}/api/preview/${jobId}/${clip.filename}`} 
+                    key={`${clip.filename}-${clip.render_version || 0}-${previewVersion}`}
+                    src={previewSrc}
                     className="preview-video"
                     onClick={handlePlayPause}
                     onEnded={() => setIsPlaying(false)}
@@ -250,13 +271,6 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                       <Sliders size={14} />
                       {showSafeZones ? "Preview" : "Safe Zone"}
                     </button>
-                  )}
-
-                  {/* Real-time Subtitle Overlay Simulation */}
-                  {isPlaying && activeWordIdx !== null && words[activeWordIdx] && (
-                    <div className="subtitle-overlay font-mono">
-                      {words[activeWordIdx].word.toUpperCase()}
-                    </div>
                   )}
 
                   {/* Simulated TikTok Safe Zone Overlay */}
@@ -293,9 +307,6 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
 
                       <div className="tok-details">
                         <div className="tok-username">@clipaura.ai</div>
-                        <div className="tok-caption">
-                          Cinematic AI short cuts with animated captions using ClipAura #editing #ai #shorts
-                        </div>
                         <div className="tok-music">
                           <span className="music-icon">♬</span>
                           <span className="music-scroll">Original Sound - clipaura.ai</span>
@@ -500,7 +511,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                         <Share2 size={14} /> Export
                       </button>
                     )}
-                    <button className="glow-button" onClick={handleSave}>
+                    <button className="glow-button" onClick={handleSave} disabled={isSaving}>
                       <Save size={14} /> Save Changes
                     </button>
                   </div>
@@ -670,28 +681,6 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             .play-button-large:hover {
               background: var(--accent);
             }
-            .subtitle-overlay {
-              position: absolute;
-              bottom: 40px;
-              left: 5%;
-              right: 5%;
-              text-align: center;
-              background: rgba(0, 0, 0, 0.85);
-              border: 2px solid var(--accent);
-              padding: 8px 16px;
-              border-radius: 8px;
-              font-size: 18px;
-              font-weight: 900;
-              letter-spacing: 0.05em;
-              color: #ffeb3b;
-              text-shadow: 2px 2px 0px #000;
-              animation: bounce 0.1s ease-in-out;
-            }
-            @keyframes bounce {
-              0% { transform: scale(0.95); }
-              100% { transform: scale(1.0); }
-            }
-
             .style-pills {
               display: flex;
               flex-direction: column;
