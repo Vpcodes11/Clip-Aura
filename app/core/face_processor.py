@@ -27,7 +27,7 @@ class FaceTracker:
         if self._face_detection is None:
             self._face_detection = mp_face_detection.FaceDetection(
                 model_selection=1,  # Full-range (within 5m)
-                min_detection_confidence=0.45
+                min_detection_confidence=0.5
             )
         return self._face_detection
 
@@ -63,10 +63,20 @@ class FaceTracker:
         raw_centers = []
         timestamps = []
 
-        while current_t <= end_time:
-            cap.set(cv2.CAP_PROP_POS_MSEC, current_t * 1000)
+        # Calculate frame-accurate sample positions
+        sample_interval = max(0.2, 1.0 / max(fps, 1))
+        frame_num = int(start_time * fps)
+        end_frame = int(end_time * fps)
+
+        while frame_num <= end_frame:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
             ret, frame = cap.read()
             if not ret:
+                break
+
+            # Validate actual frame position
+            actual_pos = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+            if actual_pos > end_time + sample_interval:
                 break
 
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -76,12 +86,13 @@ class FaceTracker:
                 return None
             results = detector.process(rgb_frame)
 
-            # Use active speaker detection if multiple faces found
             center_x = self._pick_active_speaker_center(results, frame, src_w, src_h)
 
             raw_centers.append(center_x)
-            timestamps.append(current_t)
-            current_t += sample_interval
+            timestamps.append(actual_pos if actual_pos > 0 else start_time + frame_num / fps)
+
+            # Advance by sample_interval in frames
+            frame_num += max(1, int(sample_interval * fps))
 
         cap.release()
 
@@ -89,7 +100,7 @@ class FaceTracker:
             return None
 
         # --- Gaussian Smoothing (cinematic momentum) ---
-        smoothed_centers = self._gaussian_smooth(raw_centers, sigma=3.0)
+        smoothed_centers = self._gaussian_smooth(raw_centers, sigma=2.0)
 
         # Map back to timestamps
         coord_map = {}
@@ -110,7 +121,7 @@ class FaceTracker:
     # Upgrade 2: Active speaker detection
     # ------------------------------------------------------------------
 
-    def _pick_active_speaker_center(self, results, frame, src_w, src_h) -> float:
+    def _pick_active_speaker_center(self, results, _frame, src_w, src_h) -> float:
         """
         When multiple faces are detected, pick the active speaker using
         a lip-openness heuristic: the face with the tallest bounding box
@@ -173,8 +184,8 @@ class FaceTracker:
     def generate_sendcmd_file(self, tracking: dict, output_path: str) -> str:
         """
         Writes an FFmpeg sendcmd script file that updates the crop X
-        coordinate at each sampled timestamp, enabling true real-time
-        camera panning in the rendered output.
+        coordinate at each frame boundary, using linear interpolation
+        between tracking keypoints for smooth, stepless motion.
 
         Format:  <timestamp> [OUT] crop x <value>;
         """
@@ -186,15 +197,37 @@ class FaceTracker:
             return output_path
 
         start_t = min(timestamps)
-        for i, ts in enumerate(timestamps):
-            x = coords[ts]
-            rel_ts = max(0.0, ts - start_t)
-            # FFmpeg sendcmd time is relative to clip start (0-based)
-            lines.append(f"{rel_ts:.2f} [OUT] crop x {x};")
 
-        content = "\n".join(lines)
+        # Interpolate: emit commands at ~30 fps granularity between keypoints
+        interp_interval = 1.0 / 30.0
+        x_values = [coords[ts] for ts in timestamps]
+        rel_times = [max(0.0, ts - start_t) for ts in timestamps]
+
+        current_t = 0.0
+        seg_idx = 0
+
+        while seg_idx < len(rel_times) - 1 and current_t <= rel_times[-1]:
+            t0, x0 = rel_times[seg_idx], x_values[seg_idx]
+            t1, x1 = rel_times[seg_idx + 1], x_values[seg_idx + 1]
+
+            while current_t <= t1:
+                frac = (current_t - t0) / max(t1 - t0, 1e-6)
+                frac = max(0.0, min(1.0, frac))
+                # Ease-in-out quad for cinematic deceleration at keypoints
+                eased = frac * frac * (3.0 - 2.0 * frac)
+                interp_x = int(x0 + (x1 - x0) * eased)
+                lines.append(f"{current_t:.3f} [OUT] crop x {interp_x};")
+                current_t += interp_interval
+
+            seg_idx += 1
+
+        # Ensure final frame is covered
+        if current_t <= rel_times[-1] + interp_interval:
+            lines.append(f"{rel_times[-1]:.3f} [OUT] crop x {int(x_values[-1])};")
+
+        cmd_content = "\n".join(lines)
         with open(output_path, 'w') as f:
-            f.write(content)
+            f.write(cmd_content)
 
         return output_path
 
