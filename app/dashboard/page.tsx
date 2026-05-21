@@ -298,8 +298,8 @@ export default function Dashboard() {
         }
 
         .panel-top {
-          padding: 24px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          padding: 28px 28px 24px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -308,10 +308,12 @@ export default function Dashboard() {
         }
 
         .panel-top h2 {
-          font-size: 18px;
+          font-size: 16px;
+          font-weight: 600;
           display: flex;
           align-items: center;
           gap: 10px;
+          color: var(--muted-strong);
         }
 
         .active-badge,
@@ -374,13 +376,13 @@ export default function Dashboard() {
 
         .project-row {
           display: grid;
-          grid-template-columns: minmax(220px, 1fr) 220px auto;
-          gap: 16px;
+          grid-template-columns: minmax(220px, 1fr) 240px auto;
+          gap: 24px;
           align-items: center;
-          min-height: 72px;
-          padding: 16px 24px;
-          border-top: 1px solid rgba(255, 255, 255, 0.07);
-          transition: background 0.18s ease, transform 0.18s ease;
+          min-height: 88px;
+          padding: 20px 28px;
+          border-top: 1px solid rgba(255, 255, 255, 0.04);
+          transition: background 0.18s ease;
         }
 
         .project-row:hover {
@@ -390,7 +392,7 @@ export default function Dashboard() {
         .source-cell {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 14px;
           min-width: 0;
         }
 
@@ -418,7 +420,9 @@ export default function Dashboard() {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          font-size: 14px;
+          font-size: 15px;
+          font-weight: 600;
+          margin-bottom: 4px;
         }
 
         .source-cell small {
@@ -443,15 +447,15 @@ export default function Dashboard() {
         .meta-cell {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 14px;
         }
 
         .status-pill {
           border-radius: 999px;
-          padding: 4px 8px;
+          padding: 5px 10px;
           font-size: 12px;
-          font-weight: 800;
-          background: rgba(255, 255, 255, 0.06);
+          font-weight: 650;
+          background: rgba(255, 255, 255, 0.05);
           color: var(--muted-strong);
           white-space: nowrap;
         }
@@ -473,7 +477,7 @@ export default function Dashboard() {
         .clip-badge {
           color: var(--muted);
           font-size: 12px;
-          font-weight: 650;
+          font-weight: 550;
           white-space: nowrap;
         }
 
@@ -496,13 +500,13 @@ export default function Dashboard() {
           display: flex;
           align-items: center;
           justify-content: flex-end;
-          gap: 8px;
+          gap: 10px;
         }
 
         .row-actions a {
-          min-height: 32px;
+          min-height: 36px;
           border-radius: 9px;
-          padding: 0 10px;
+          padding: 0 14px;
           background: rgba(255, 255, 255, 0.08);
           text-decoration: none;
           font-size: 12px;
@@ -549,9 +553,9 @@ export default function Dashboard() {
           grid-template-columns: 36px minmax(0, 1fr) 92px;
           gap: 14px;
           align-items: center;
-          min-height: 74px;
-          padding: 16px 24px;
-          border-top: 1px solid rgba(255, 255, 255, 0.07);
+          min-height: 88px;
+          padding: 20px 28px;
+          border-top: 1px solid rgba(255, 255, 255, 0.04);
         }
 
         .skeleton-dot {
@@ -614,8 +618,8 @@ export default function Dashboard() {
         @media (max-width: 860px) {
           .project-row {
             grid-template-columns: 1fr;
-            gap: 12px;
-            padding: 18px;
+            gap: 14px;
+            padding: 20px;
           }
 
           .meta-cell {
@@ -639,7 +643,7 @@ export default function Dashboard() {
 
           .project-skeleton {
             grid-template-columns: 36px minmax(0, 1fr);
-            padding: 18px;
+            padding: 20px;
           }
 
           .skeleton-pill {
@@ -671,7 +675,7 @@ export default function Dashboard() {
           .panel-top {
             flex-direction: column;
             align-items: stretch;
-            padding: 18px;
+            padding: 22px;
           }
 
           .panel-top h2 {
@@ -1026,7 +1030,7 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
 
       <style jsx>{`
         .project-row-wrapper {
-          border-top: 1px solid rgba(255, 255, 255, 0.07);
+          border-top: 1px solid rgba(255, 255, 255, 0.04);
           transition: background 0.18s ease;
         }
 
@@ -1131,8 +1135,7 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
           font-weight: 700;
           color: #ffffff;
           margin-bottom: 18px;
-          letter-spacing: 0.03em;
-          text-transform: uppercase;
+          letter-spacing: 0;
           display: flex;
           align-items: center;
         }
