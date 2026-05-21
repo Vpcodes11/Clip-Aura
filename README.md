@@ -82,3 +82,4 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 - **AI Engine**: Powered by Groq (Whisper + LLaMA)
 - **Face Tracking**: MediaPipe by Google
 - **Typography**: Montserrat & Inter via Google Fonts
+
