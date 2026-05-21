@@ -76,10 +76,21 @@ export default function Home() {
             <div className="bento-icon"><Upload size={24} /></div>
             <h3>Instant Deployment</h3>
             <p>Seamlessly export directly to TikTok, Reels, and Shorts with a single click.</p>
-            <Link className="bento-btn" href="/dashboard">Try Upload <ArrowRight size={14} /></Link>
+            <Link className="bento-btn" href="/login">Try Upload <ArrowRight size={14} /></Link>
           </motion.div>
         </motion.div>
       </section>
+
+      {/* CTA Section */}
+      <section className="cta-section">
+        <h2 className="text-gradient">Ready to transform your content?</h2>
+        <p>Start generating viral shorts with AI precision today.</p>
+        <Link className="glow-button" href="/login">Access Beta</Link>
+      </section>
+
+      <footer className="landing-footer">
+        <span>&copy; {new Date().getFullYear()} Clip Aura</span>
+      </footer>
     </main>
   );
 }
