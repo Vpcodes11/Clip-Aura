@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clip Aura — Cinematic AI Video Clipping</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="glow-mesh"></div>
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-inner">
+            <a href="/" class="logo">
+                <img src="/static/logo.png" alt="O" style="width: 32px; height: 32px; border-radius: 8px;">
+                Clip Aura
+            </a>
+            
+            <div id="nav-actions">
+                <button id="login-btn" class="btn btn-primary">Sign In</button>
+                
+                <div id="user-profile" class="user-badge hidden">
+                    <span id="user-credits" style="font-size: 12px; font-weight: 600; color: var(--text-2);">0/0 min</span>
+                    <div id="user-tier" class="tier-tag">Free</div>
+                    <button id="logout-btn" class="btn-icon" title="Logout" style="background:none; border:none; color:var(--text-3); cursor:pointer;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container">
+        <!-- Hero Section -->
+        <section id="hero-section" class="hero section">
+            <div class="hero-image-wrapper">
+                <img src="/static/hero.png" alt="Cinematic AI" class="hero-image">
+            </div>
+            <h1>Turn Podcasts into <br><span style="color: var(--primary);">Viral Clips</span></h1>
+            <p>Our AI analyzes your long-form content, finds the most engaging hooks, and reframes them for TikTok, Reels, and Shorts instantly.</p>
+
+            <div class="command-center">
+                <div class="command-tabs">
+                    <button class="command-tab input-tab active" data-tab="upload">Upload Video</button>
+                    <button class="command-tab input-tab" data-tab="url">Paste URL</button>
+                </div>
+
+                <div class="command-content">
+                    <!-- Upload Tab -->
+                    <div id="content-upload" class="tab-content active">
+                        <div id="drop-zone" class="drop-zone">
+                            <input type="file" id="file-input" class="hidden" accept="video/*" style="display:none;">
+                            <div id="drop-zone-inner">
+                                <svg class="drop-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                                <h3>Drag & drop video</h3>
+                                <p style="font-size: 14px; margin-top: 8px;">Supports MP4, MOV, WEBM up to 2GB</p>
+                            </div>
+                            <div id="file-info" class="hidden">
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 12px;">
+                                    <div class="logo-icon" style="background: var(--success); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">✓</div>
+                                    <div style="text-align: left;">
+                                        <div id="file-name" style="font-weight: 700;">video.mp4</div>
+                                        <div id="file-size" style="font-size: 12px; color: var(--text-3);">0 MB</div>
+                                    </div>
+                                    <button id="remove-file-btn" class="btn btn-secondary" style="padding: 4px 12px; font-size: 12px;">Change</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- URL Tab -->
+                    <div id="content-url" class="tab-content hidden">
+                        <div class="url-input-wrapper">
+                            <input type="text" id="url-input" class="url-input" style="width:100%;" placeholder="Paste YouTube, Vimeo, or direct video link...">
+                        </div>
+                    </div>
+
+                    <!-- Global Settings -->
+                    <div class="settings-bar">
+                        <div class="setting-item">
+                            <label class="setting-label">FRAME PRESET</label>
+                            <select id="preset-select" class="setting-select">
+                                <option value="tiktok">9:16 Portrait (TikTok/Reels)</option>
+                                <option value="landscape">16:9 Original (YouTube)</option>
+                                <option value="square">1:1 Square (Instagram)</option>
+                            </select>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">CAPTION STYLE</label>
+                            <select id="caption-select" class="setting-select">
+                                <option value="typography_motion">Cursive + CAPS (Alex Hormozi)</option>
+                                <option value="modern_bold">Modern Bold (MrBeast)</option>
+                                <option value="minimal">Minimal White</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 32px;">
+                        <button id="start-btn" class="btn btn-primary btn-block" style="width: 100%; justify-content: center; height: 56px; font-size: 16px;" disabled>
+                            Generate Viral Clips
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Processing View -->
+        <section id="processing-section" class="section hidden">
+            <div class="processing-container">
+                <div class="ai-pulse">
+                    <div class="pulse-circle"></div>
+                    <div class="pulse-inner">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
+                            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                        </svg>
+                    </div>
+                </div>
+                <h2 id="progress-message">Analyzing your video...</h2>
+                <div style="max-width: 500px; margin: 32px auto;">
+                    <div class="progress-track">
+                        <div id="progress-fill" class="progress-fill"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 14px; color: var(--text-3);">
+                        <span id="processing-source">source.mp4</span>
+                        <span id="progress-percent">0%</span>
+                    </div>
+                </div>
+
+                <!-- Pipeline Steps -->
+                <div id="pipeline-steps" style="display: flex; justify-content: center; gap: 40px; margin-top: 40px;">
+                    <div id="step-download" class="step-item">Download</div>
+                    <div id="step-transcribe" class="step-item">Transcribe</div>
+                    <div id="step-analyze" class="step-item">AI Analysis</div>
+                    <div id="step-render" class="step-item">Rendering</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Results View -->
+        <section id="results-section" class="section hidden">
+            <div class="results-header">
+                <div>
+                    <h2 style="font-size: 32px;">Generated Clips</h2>
+                    <p id="results-summary" style="color: var(--text-2);">Successfully extracted viral moments.</p>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button id="download-all-btn" class="btn btn-secondary">Download All</button>
+                    <button id="new-project-btn" class="btn btn-primary">New Project</button>
+                </div>
+            </div>
+
+            <div id="clips-grid" class="clips-grid">
+                <!-- Clips injected here -->
+            </div>
+        </section>
+
+        <!-- Error View -->
+        <section id="error-section" class="section hidden" style="text-align: center;">
+            <div class="logo-icon" style="background: var(--error); margin: 0 auto 24px; width: 64px; height: 64px; font-size: 32px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">!</div>
+            <h2 style="margin-bottom: 12px;">Something went wrong</h2>
+            <p id="error-message" style="color: var(--text-2); margin-bottom: 32px;">Failed to process video.</p>
+            <button id="retry-btn" class="btn btn-primary">Try Again</button>
+        </section>
+    </main>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2 id="auth-title" style="margin-bottom: 8px;">Welcome to Clip Aura</h2>
+            <p style="color: var(--text-2); font-size: 14px; margin-bottom: 32px;">The elite tool for viral video creation.</p>
+            
+            <form id="auth-form" class="auth-form">
+                <div style="margin-bottom: 20px;">
+                    <label class="setting-label">EMAIL ADDRESS</label>
+                    <input type="email" id="auth-email" class="url-input" style="width:100%;" placeholder="you@example.com" required>
+                </div>
+                <div style="margin-bottom: 32px;">
+                    <label class="setting-label">PASSWORD</label>
+                    <input type="password" id="auth-password" class="url-input" style="width:100%;" placeholder="••••••••" required>
+                </div>
+                <button type="submit" id="auth-submit" class="btn btn-primary" style="width: 100%; justify-content: center; height: 48px;">Continue</button>
+            </form>
+
+            <div class="auth-divider"><span>OR</span></div>
+            
+            <button id="google-auth-btn" class="btn btn-secondary" style="width: 100%; justify-content: center; height: 48px; gap: 12px;">
+                <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                Continue with Google
+            </button>
+
+            <div style="margin-top: 32px; text-align: center; font-size: 14px; color: var(--text-3);">
+                <span id="auth-toggle-text">Don't have an account? <a href="#" id="auth-toggle" style="color: var(--primary);">Sign Up</a></span>
+            </div>
+            
+            <button id="close-auth" class="modal-close" style="position: absolute; top: 20px; right: 20px; color: var(--text-3); background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+        </div>
+    </div>
+
+    <!-- Pricing Modal -->
+    <div id="pricing-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2 style="text-align: center; margin-bottom: 8px;">Upgrade to Pro</h2>
+            <p style="text-align: center; color: var(--text-2); font-size: 14px; margin-bottom: 40px;">Get unlimited access and premium features.</p>
+            
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <div style="font-size: 12px; font-weight: 800; color: var(--text-3); margin-bottom: 8px;">FREE TIER</div>
+                    <div style="font-size: 32px; font-weight: 800;">₹0<span style="font-size: 14px; color: var(--text-3);">/mo</span></div>
+                    <ul style="list-style: none; text-align: left; margin: 24px 0; font-size: 14px; color: var(--text-2);">
+                        <li style="margin-bottom: 8px;">✓ 15 mins/month</li>
+                        <li style="margin-bottom: 8px;">✕ Mandatory Watermark</li>
+                        <li style="margin-bottom: 8px;">✕ Low priority queue</li>
+                    </ul>
+                    <button class="btn btn-secondary btn-block" style="width: 100%; justify-content: center;" onclick="hidePricingModal()">Current Plan</button>
+                </div>
+                
+                <div class="pricing-card popular">
+                    <div class="popular-tag">MOST POPULAR</div>
+                    <div style="font-size: 12px; font-weight: 800; color: var(--primary); margin-bottom: 8px;">CREATOR PRO</div>
+                    <div style="font-size: 32px; font-weight: 800;">₹2,499<span style="font-size: 14px; color: var(--text-3);">/mo</span></div>
+                    <ul style="list-style: none; text-align: left; margin: 24px 0; font-size: 14px; color: var(--text-2);">
+                        <li style="margin-bottom: 8px;">✓ 200 mins/month</li>
+                        <li style="margin-bottom: 8px;">✓ **No Watermark**</li>
+                        <li style="margin-bottom: 8px;">✓ GPU Priority Queue</li>
+                        <li style="margin-bottom: 8px;">✓ 4K Exports</li>
+                    </ul>
+                    <button id="checkout-btn" class="btn btn-primary btn-block" style="width: 100%; justify-content: center; background: linear-gradient(135deg, var(--primary), var(--accent)); color: white;">Upgrade Now</button>
+                </div>
+            </div>
+            
+            <button class="close-modal" style="position: absolute; top: 20px; right: 20px; color: var(--text-3); background:none; border:none; font-size:20px; cursor:pointer;" onclick="hidePricingModal()">✕</button>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
