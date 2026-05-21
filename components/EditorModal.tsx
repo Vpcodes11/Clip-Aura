@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, Play, Save, RotateCcw, Video, Type, Sliders, Share2 } from 'lucide-react';
+import { X, Play, Save, RotateCcw, Video, Type, Sliders, Share2, Pencil, Ellipsis } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/supabase';
 
 export interface Word {
@@ -66,9 +66,11 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
   const [preset, setPreset] = useState('tiktok');
   
   const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeWordIdx, setActiveWordIdx] = useState<number | null>(null);
   const [showSafeZones, setShowSafeZones] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [editingWordIdx, setEditingWordIdx] = useState<number | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   
@@ -125,6 +127,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
   const handleSave = async () => {
     if (!clip) return;
     setIsSaving(true);
+    setErrorMessage(null);
     
     try {
       const response = await authenticatedFetch(`${apiUrl}/api/clip/edit`, {
@@ -159,7 +162,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             } else if (statusData.status === 'error') {
               clearInterval(pollTimer);
               setIsSaving(false);
-              alert('Pipeline failed during caption re-rendering.');
+              setErrorMessage('Render failed. Please try again.');
             }
           }
         } catch (err) {
@@ -169,7 +172,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
 
     } catch (err) {
       console.error(err);
-      alert('Failed to submit caption edits.');
+      setErrorMessage('Failed to save. Please try again.');
       setIsSaving(false);
     }
   };
@@ -191,20 +194,25 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             {isSaving && (
               <div className="loading-overlay">
                 <div className="spinner"></div>
-                <h3>Regenerating Captions...</h3>
-                <p className="text-muted text-sm">FFmpeg is rendering your custom typography and frames</p>
+                <h3>Saving your changes...</h3>
+                <p className="text-muted text-sm">Rendering your clip</p>
               </div>
             )}
 
             {/* Header */}
             <div className="editor-header">
               <div className="header-title">
-                <Sparkles size={18} className="text-accent" />
-                <h2>Clip Aura Studio Editor</h2>
-                <span className="badge font-mono">CLIP #{clipIndex + 1}</span>
+                <h2>{clip.title}</h2>
               </div>
               <button onClick={onClose} className="close-btn"><X size={20} /></button>
             </div>
+
+            {errorMessage && (
+              <div className="error-banner">
+                <span>{errorMessage}</span>
+                <button onClick={() => setErrorMessage(null)} className="error-dismiss"><X size={14} /></button>
+              </div>
+            )}
 
             {/* Layout */}
             <div className="editor-layout">
@@ -212,11 +220,11 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               {/* Left Column: Player & Subtitle Canvas */}
               <div className="player-column">
                 <div 
-                  className="video-viewport glass"
+                  className="video-viewport"
                   style={{
                     aspectRatio: preset === 'landscape' ? '16/9' : '9/16',
-                    height: '100%',
-                    maxHeight: '380px',
+                    maxWidth: preset === 'landscape' ? '100%' : '360px',
+                    width: '100%',
                     margin: '0 auto',
                     transition: 'aspect-ratio 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                   }}
@@ -230,18 +238,19 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                     onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                   />
                   
-                  {/* Safe Zone Toggle Button */}
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowSafeZones(!showSafeZones);
-                    }}
-                    className={`safe-zone-toggle glass ${showSafeZones ? 'active' : ''}`}
-                    title="Toggle Social Media Safe Zones"
-                  >
-                    <Sliders size={14} />
-                    {showSafeZones ? "Hide Safe Zones" : "Show Safe Zones"}
-                  </button>
+                  {showAdvanced && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowSafeZones(!showSafeZones);
+                      }}
+                      className={`safe-zone-toggle ${showSafeZones ? 'active' : ''}`}
+                      title="Toggle Social Media Safe Zones"
+                    >
+                      <Sliders size={14} />
+                      {showSafeZones ? "Preview" : "Safe Zone"}
+                    </button>
+                  )}
 
                   {/* Real-time Subtitle Overlay Simulation */}
                   {isPlaying && activeWordIdx !== null && words[activeWordIdx] && (
@@ -306,11 +315,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                 </div>
 
                 {/* Interactive Audio Waveform Seeker */}
-                <div className="audio-waveform-container glass">
-                  <div className="waveform-header">
-                    <span>Audio Waveform Seek Bar</span>
-                    <span className="font-mono text-xs">{currentTime.toFixed(1)}s / {(((clip.end_time || 10) - (clip.start_time || 0))).toFixed(1)}s</span>
-                  </div>
+                <div className="audio-waveform-container">
                   <div 
                     className="waveform-visualizer"
                     onClick={(e) => {
@@ -348,59 +353,81 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                 </div>
 
                 {/* Subtitle Styles and Presets */}
-                <div className="controls-box glass">
-                  <div className="control-row">
-                    <div className="control-item">
-                      <label><Type size={14} /> Caption Style</label>
-                      <select 
-                        value={captionStyle} 
-                        onChange={(e) => setCaptionStyle(e.target.value)}
-                        className="stealth-select"
-                      >
-                        <option value="typography_motion">Karaoke Pop (Dynamic)</option>
-                        <option value="cursive_caps">Cursive + CAPS</option>
-                        <option value="standard_caption">Standard Block</option>
-                      </select>
-                    </div>
-
-                    <div className="control-item">
-                      <label><Video size={14} /> Aspect Ratio</label>
-                      <select 
-                        value={preset} 
-                        onChange={(e) => setPreset(e.target.value)}
-                        className="stealth-select"
-                      >
-                        <option value="tiktok">Portrait (9:16)</option>
-                        <option value="youtube_shorts">YouTube Shorts (9:16)</option>
-                        <option value="landscape">Landscape (16:9)</option>
-                      </select>
-                    </div>
+                <div className="style-pills">
+                  <div className="pill-group">
+                    <button
+                      className={`pill ${captionStyle === 'typography_motion' ? 'active' : ''}`}
+                      onClick={() => setCaptionStyle('typography_motion')}
+                    >
+                      <Type size={13} /> Karaoke
+                    </button>
+                    <button
+                      className={`pill ${captionStyle === 'cursive_caps' ? 'active' : ''}`}
+                      onClick={() => setCaptionStyle('cursive_caps')}
+                    >
+                      Cursive
+                    </button>
+                    <button
+                      className={`pill ${captionStyle === 'standard_caption' ? 'active' : ''}`}
+                      onClick={() => setCaptionStyle('standard_caption')}
+                    >
+                      Standard
+                    </button>
                   </div>
-
-                  <div className="control-item mt-4">
-                    <label><Sliders size={14} /> Hook Caption (Headline Overlay)</label>
-                    <input 
-                      type="text" 
-                      value={hookCaption}
-                      onChange={(e) => setHookCaption(e.target.value)}
-                      placeholder="e.g. THE #1 SECRET OF SUCCESS..."
-                      className="stealth-input-field"
-                    />
+                  <div className="pill-group">
+                    <button
+                      className={`pill ${preset === 'tiktok' ? 'active' : ''}`}
+                      onClick={() => setPreset('tiktok')}
+                    >
+                      <Video size={13} /> 9:16
+                    </button>
+                    <button
+                      className={`pill ${preset === 'youtube_shorts' ? 'active' : ''}`}
+                      onClick={() => setPreset('youtube_shorts')}
+                    >
+                      9:16
+                    </button>
+                    <button
+                      className={`pill ${preset === 'landscape' ? 'active' : ''}`}
+                      onClick={() => setPreset('landscape')}
+                    >
+                      16:9
+                    </button>
                   </div>
+                  {showAdvanced && (
+                    <div className="pill-group">
+                      <label className="pill-input-label">
+                        <Sliders size={13} />
+                        <input
+                          type="text"
+                          value={hookCaption}
+                          onChange={(e) => setHookCaption(e.target.value)}
+                          placeholder="Hook caption..."
+                          className="pill-input"
+                        />
+                      </label>
+                    </div>
+                  )}
+                  <button
+                    className="pill pill-more"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    title="More options"
+                  >
+                    <Ellipsis size={14} />
+                  </button>
                 </div>
               </div>
 
-              {/* Right Column: Interactive Transcript */}
-              <div className="transcript-column glass">
+              {/* Right Column: Transcript */}
+              <div className="transcript-column">
                 <div className="transcript-header">
-                  <h3>Interactive Transcript</h3>
-                  <span className="text-muted text-xs">Click word to seek video · Type to edit text</span>
+                  <h3>Transcript</h3>
                 </div>
 
                 <div className="words-scrollable">
                   {words.length === 0 ? (
                     <div className="empty-transcript">
-                      <p className="text-muted text-sm">Loading transcript timestamps...</p>
+                      <p className="text-muted text-sm">No transcript yet</p>
                     </div>
                   ) : (
                     <div className="words-grid">
@@ -409,15 +436,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                           key={idx}
                           className={`word-card ${activeWordIdx === idx ? 'active' : ''} ${editingWordIdx === idx ? 'editing' : ''}`}
                           onClick={() => handleWordClick(word)}
-                          onDoubleClick={(e) => {
-                            e.stopPropagation();
-                            setEditingWordIdx(idx);
-                          }}
-                          title="Click to seek · Double-click to edit text"
                         >
-                          <div className="word-timestamp font-mono">
-                            {word.start.toFixed(1)}s
-                          </div>
                           {editingWordIdx === idx ? (
                             <input 
                               type="text" 
@@ -434,8 +453,18 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                               autoFocus
                             />
                           ) : (
-                            <div className="word-display font-medium">
-                              {word.word}
+                            <div className="word-display">
+                              <span className="word-text">{word.word}</span>
+                              <button
+                                className="word-edit-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingWordIdx(idx);
+                                }}
+                                title="Edit word"
+                              >
+                                <Pencil size={11} />
+                              </button>
                             </div>
                           )}
                         </div>
@@ -445,50 +474,72 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                 </div>
 
                 <div className="transcript-footer">
-                  <div className="control-item w-full">
-                    <label>Clip Title</label>
-                    <input 
-                      type="text" 
-                      value={title} 
-                      onChange={(e) => setTitle(e.target.value)}
-                      className="stealth-input-field"
-                    />
+                  <input 
+                    type="text" 
+                    value={title} 
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Clip title"
+                    className="pill-input"
+                  />
+                  <div className="transcript-actions">
+                    <button className="reset-btn" onClick={() => {
+                      if (clip.words && clip.words.length > 0) {
+                        setWords(JSON.parse(JSON.stringify(clip.words)));
+                      } else {
+                        setWords(getMockWords(clip));
+                      }
+                    }}>
+                      <RotateCcw size={14} /> Reset
+                    </button>
+                    {onExport && (
+                      <button 
+                        className="export-trigger-btn" 
+                        onClick={onExport}
+                        type="button"
+                      >
+                        <Share2 size={14} /> Export
+                      </button>
+                    )}
+                    <button className="glow-button" onClick={handleSave}>
+                      <Save size={14} /> Save Changes
+                    </button>
                   </div>
                 </div>
               </div>
 
             </div>
 
-            {/* Footer Buttons */}
-            <div className="editor-footer">
-              <button className="reset-btn glass" onClick={() => {
-                if (clip.words && clip.words.length > 0) {
-                  setWords(JSON.parse(JSON.stringify(clip.words)));
-                } else {
-                  setWords(getMockWords(clip));
-                }
-              }}>
-                <RotateCcw size={16} /> Reset
-              </button>
-              <div className="flex gap-4">
-                {onExport && (
-                  <button 
-                    className="export-trigger-btn glass flex items-center gap-2" 
-                    onClick={onExport}
-                    type="button"
-                  >
-                    <Share2 size={16} /> Export
-                  </button>
-                )}
-                <button className="glow-button flex items-center gap-2" onClick={handleSave}>
-                  <Save size={16} /> Save and render
-                </button>
-              </div>
-            </div>
-
           </motion.div>
 
           <style jsx>{`
+            .error-banner {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 12px;
+              padding: 10px 16px;
+              margin-bottom: 12px;
+              background: rgba(239, 68, 68, 0.08);
+              border: 1px solid rgba(239, 68, 68, 0.18);
+              border-radius: 10px;
+              color: #fca5a5;
+              font-size: 13px;
+              font-weight: 500;
+            }
+            .error-dismiss {
+              background: none;
+              border: none;
+              color: #fca5a5;
+              cursor: pointer;
+              padding: 2px;
+              border-radius: 4px;
+              display: flex;
+              align-items: center;
+            }
+            .error-dismiss:hover {
+              background: rgba(239, 68, 68, 0.15);
+            }
+
             .editor-overlay {
               position: fixed;
               top: 0; left: 0; width: 100%; height: 100%;
@@ -506,9 +557,20 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               height: 95vh;
               display: flex;
               flex-direction: column;
-              padding: 24px;
+              padding: 32px;
               position: relative;
               overflow: hidden;
+            }
+            @media (max-width: 640px) {
+              .editor-window {
+                padding: 20px;
+              }
+              .editor-layout {
+                gap: 20px;
+              }
+              .words-grid {
+                grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+              }
             }
             @media (min-width: 768px) {
               .editor-window {
@@ -543,37 +605,27 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               justify-content: space-between;
               align-items: center;
               margin-bottom: 20px;
-              border-bottom: 1px solid rgba(255,255,255,0.05);
-              padding-bottom: 16px;
+              padding-bottom: 12px;
             }
             .header-title {
               display: flex;
               align-items: center;
               gap: 12px;
             }
-            .header-title h2 { font-size: 20px; font-weight: 700; }
-            .badge {
-              font-size: 10px;
-              font-weight: 800;
-              background: rgba(255,255,255,0.05);
-              border: 1px solid rgba(255,255,255,0.1);
-              padding: 2px 8px;
-              border-radius: 4px;
-              color: var(--accent);
-            }
+            .header-title h2 { font-size: 16px; font-weight: 600; color: var(--muted-strong); }
             .close-btn { background: none; border: none; color: var(--muted); cursor: pointer; }
 
             .editor-layout {
               display: grid;
               grid-template-columns: 1fr;
-              gap: 24px;
+              gap: 32px;
               flex: 1;
               min-height: 0;
               overflow-y: auto;
             }
             @media (min-width: 768px) {
               .editor-layout {
-                grid-template-columns: 420px 1fr;
+                grid-template-columns: 1fr 320px;
                 overflow: hidden;
               }
             }
@@ -581,18 +633,18 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             .player-column {
               display: flex;
               flex-direction: column;
-              gap: 16px;
+              gap: 12px;
               height: 100%;
+              overflow-y: auto;
             }
             .video-viewport {
               background: #000;
-              border-radius: 12px;
+              border-radius: 14px;
               position: relative;
               overflow: hidden;
               display: flex;
               align-items: center;
               justify-content: center;
-              box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8), 0 8px 32px rgba(0, 0, 0, 0.4);
             }
             .preview-video {
               width: 100%;
@@ -608,16 +660,14 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               cursor: pointer;
             }
             .play-button-large {
-              width: 56px; height: 56px;
-              background: rgba(139, 92, 246, 0.8);
+              width: 48px; height: 48px;
+              background: rgba(139, 92, 246, 0.7);
               border: none; border-radius: 50%;
               display: flex; align-items: center; justify-content: center;
               cursor: pointer;
               transition: 0.2s ease-in-out;
-              box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
             }
             .play-button-large:hover {
-              transform: scale(1.05);
               background: var(--accent);
             }
             .subtitle-overlay {
@@ -642,172 +692,191 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               100% { transform: scale(1.0); }
             }
 
-            .controls-box {
-              padding: 16px;
-              border-radius: 12px;
-            }
-            .control-row {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 12px;
-            }
-            .control-item {
+            .style-pills {
               display: flex;
               flex-direction: column;
-              gap: 6px;
+              gap: 10px;
+              position: relative;
             }
-            .control-item label {
-              font-size: 11px;
-              font-weight: 700;
-              color: var(--muted);
-              text-transform: uppercase;
-              letter-spacing: 0.05em;
+            .pill-more {
+              position: absolute;
+              top: 0;
+              right: 0;
+              padding: 6px 8px;
+              min-width: 32px;
+              justify-content: center;
+            }
+            .pill-more:hover {
+              background: rgba(255,255,255,0.04);
+            }
+            .pill-group {
               display: flex;
+              gap: 6px;
+              align-items: center;
+            }
+            .pill {
+              display: inline-flex;
               align-items: center;
               gap: 6px;
-            }
-            .stealth-select {
-              background: rgba(255, 255, 255, 0.015);
-              border: 1px solid rgba(255, 255, 255, 0.05);
-              border-radius: 10px;
-              padding: 10px 14px;
-              color: #fff;
-              font-size: 13px;
-              outline: none;
+              padding: 6px 14px;
+              border-radius: 8px;
+              border: 1px solid rgba(255,255,255,0.06);
+              background: transparent;
+              color: var(--muted);
+              font-size: 12px;
+              font-weight: 600;
               cursor: pointer;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+              transition: all 0.15s ease;
             }
-            .stealth-select:hover {
-              background: rgba(255, 255, 255, 0.03);
-              border-color: rgba(255, 255, 255, 0.12);
+            .pill:hover {
+              border-color: rgba(255,255,255,0.14);
+              color: var(--muted-strong);
             }
-            .stealth-select option {
-              background: #0d0d12;
-              color: #ffffff;
-              padding: 12px;
+            .pill.active {
+              background: rgba(139, 92, 246, 0.12);
+              border-color: rgba(139, 92, 246, 0.35);
+              color: #c4b5fd;
             }
-            .stealth-input-field {
-              background: rgba(255, 255, 255, 0.015);
-              border: 1px solid rgba(255, 255, 255, 0.05);
-              border-radius: 10px;
-              padding: 12px 16px;
-              color: #fff;
-              font-size: 13px;
-              outline: none;
+            .pill-input-label {
+              display: flex;
+              align-items: center;
+              gap: 8px;
               width: 100%;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
             }
-            .stealth-input-field:hover {
-              background: rgba(255, 255, 255, 0.03);
-              border-color: rgba(255, 255, 255, 0.12);
+            .pill-input {
+              flex: 1;
+              background: transparent;
+              border: 0;
+              border-bottom: 1px solid rgba(255,255,255,0.06);
+              padding: 6px 0;
+              color: #fff;
+              font-size: 12px;
+              font-weight: 500;
+              outline: none;
+              transition: border-color 0.15s ease;
             }
-            .stealth-input-field:focus, .stealth-select:focus {
-              border-color: rgba(139, 92, 246, 0.5);
-              background: rgba(255, 255, 255, 0.02);
-              box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.2);
-              transform: translateY(-1px);
+            .pill-input:focus {
+              border-bottom-color: rgba(139,92,246,0.4);
+            }
+            .pill-input::placeholder {
+              color: var(--muted);
+              opacity: 0.6;
             }
 
             .transcript-column {
               display: flex;
               flex-direction: column;
-              border-radius: 12px;
               height: 100%;
               overflow: hidden;
             }
             .transcript-header {
-              padding: 16px 20px;
-              border-bottom: 1px solid rgba(255,255,255,0.05);
+              padding: 16px 20px 12px;
             }
-            .transcript-header h3 { font-size: 14px; font-weight: 700; }
+            .transcript-header h3 { font-size: 13px; font-weight: 600; color: var(--muted); }
             
             .words-scrollable {
               flex: 1;
               overflow-y: auto;
-              padding: 20px;
+              padding: 8px 20px;
             }
             .words-grid {
               display: grid;
-              grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-              gap: 10px;
+              grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+              gap: 8px;
             }
             .word-card {
-              background: rgba(255, 255, 255, 0.015);
+              background: rgba(255, 255, 255, 0.02);
               border: 1px solid rgba(255, 255, 255, 0.04);
-              border-radius: 10px;
+              border-radius: 8px;
               padding: 10px 14px;
-              display: flex;
-              flex-direction: column;
-              gap: 6px;
               cursor: pointer;
-              transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+              transition: all 0.15s ease;
             }
             .word-card:hover {
-              background: rgba(255, 255, 255, 0.04);
-              border-color: rgba(255, 255, 255, 0.12);
-              transform: translateY(-2px);
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-            }
-            .word-card.active {
-              background: rgba(139, 92, 246, 0.06);
-              border-color: rgba(139, 92, 246, 0.6);
-              box-shadow: 0 0 16px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-            }
-            .word-timestamp {
-              font-size: 10px;
-              color: var(--accent);
-              font-weight: 600;
-              text-align: center;
-            }
-            .word-input {
-              background: rgba(0, 0, 0, 0.2);
-              border: 1px solid rgba(255, 255, 255, 0.04);
-              border-radius: 6px;
-              color: #fff;
-              font-size: 13px;
-              font-weight: 600;
-              padding: 4px 8px;
-              outline: none;
-              width: 100%;
-              transition: all 0.2s ease;
-              text-align: center;
-            }
-            .word-input:hover {
+              background: rgba(255, 255, 255, 0.05);
               border-color: rgba(255, 255, 255, 0.1);
             }
-            .word-input:focus {
-              background: rgba(0, 0, 0, 0.4);
-              border-color: rgba(139, 92, 246, 0.5);
-              box-shadow: 0 0 8px rgba(139, 92, 246, 0.15);
+            .word-card.active {
+              background: rgba(139, 92, 246, 0.08);
+              border-color: rgba(139, 92, 246, 0.4);
+            }
+            .word-display {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 6px;
+            }
+            .word-text {
+              font-size: 15px;
+              color: #ffffff;
+              font-weight: 600;
+              text-align: center;
+              flex: 1;
+            }
+            .word-edit-btn {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background: none;
+              border: none;
+              color: var(--muted);
+              cursor: pointer;
+              opacity: 0;
+              transition: opacity 0.15s ease;
+              padding: 2px;
+              border-radius: 4px;
+              flex-shrink: 0;
+            }
+            .word-card:hover .word-edit-btn {
+              opacity: 1;
+            }
+            .word-edit-btn:hover {
+              color: #fff;
+              background: rgba(255,255,255,0.08);
+            }
+            .word-card.editing {
+              border-color: rgba(246, 92, 139, 0.4);
+              background: rgba(246, 92, 139, 0.06);
+            }
+            .word-input-edit {
+              background: transparent;
+              border: 0;
+              color: #ffffff;
+              font-size: 14px;
+              font-weight: 600;
+              padding: 0;
+              outline: none;
+              width: 100%;
+              text-align: center;
+            }
+            .word-input-edit:focus {
+              box-shadow: none;
             }
             .transcript-footer {
-              padding: 16px 20px;
-              border-top: 1px solid rgba(255,255,255,0.05);
-              background: rgba(0,0,0,0.1);
+              padding: 12px 20px 16px;
+            }
+            .transcript-actions {
+              display: flex;
+              gap: 8px;
+              margin-top: 12px;
+            }
+            .transcript-actions .glow-button {
+              flex: 1;
+              justify-content: center;
             }
 
-            .editor-footer {
-              display: flex;
-              justify-content: space-between;
-              align-items: center;
-              margin-top: 20px;
-              border-top: 1px solid rgba(255,255,255,0.05);
-              padding-top: 16px;
-            }
             .reset-btn {
               background: none;
-              padding: 10px 20px;
+              padding: 8px 14px;
               border-radius: 8px;
-              display: flex;
+              display: inline-flex;
               align-items: center;
-              gap: 8px;
-              font-size: 13px;
+              gap: 6px;
+              font-size: 12px;
               font-weight: 600;
               color: var(--muted);
               cursor: pointer;
+              border: 1px solid rgba(255,255,255,0.06);
             }
             .reset-btn:hover {
               color: #fff;
@@ -971,26 +1040,15 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             }
 
             .audio-waveform-container {
-              padding: 10px 14px;
-              border-radius: 12px;
+              padding: 8px 0;
               display: flex;
               flex-direction: column;
-              gap: 8px;
-            }
-            .waveform-header {
-              display: flex;
-              justify-content: space-between;
-              font-size: 11px;
-              font-weight: 750;
-              color: var(--muted);
-              text-transform: uppercase;
-              letter-spacing: 0.05em;
             }
             .waveform-visualizer {
-              height: 38px;
+              height: 44px;
               display: flex;
               align-items: center;
-              gap: 3px;
+              gap: 4px;
               cursor: pointer;
               padding: 4px 0;
             }
@@ -1011,46 +1069,22 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               transform: scaleY(1.05);
             }
 
-            .word-display {
-              font-size: 14px;
-              color: #ffffff;
-              font-weight: 600;
-              text-align: center;
-              padding: 4px 0;
-            }
-            .word-card.editing {
-              border-color: rgba(246, 92, 139, 0.5);
-              background: rgba(0, 0, 0, 0.4);
-            }
-            .word-input-edit {
-              background: rgba(246, 92, 139, 0.08);
-              border: 1px solid rgba(246, 92, 139, 0.3);
-              border-radius: 6px;
-              color: #ffffff;
-              font-size: 14px;
-              font-weight: 600;
-              padding: 4px 8px;
-              outline: none;
-              width: 100%;
-              text-align: center;
-              transition: all 0.2s ease;
-            }
-            .word-input-edit:focus {
-              box-shadow: 0 0 8px rgba(246, 92, 139, 0.3);
-              border-color: #f65c8b;
-            }
+
 
             .export-trigger-btn {
-              background: rgba(255, 255, 255, 0.05);
-              border: 1px solid rgba(255, 255, 255, 0.08);
+              background: rgba(255, 255, 255, 0.03);
+              border: 1px solid rgba(255, 255, 255, 0.06);
               color: var(--muted-strong);
-              padding: 0 16px;
-              height: 38px;
-              border-radius: 10px;
-              font-size: 13px;
-              font-weight: 750;
+              padding: 8px 14px;
+              height: auto;
+              border-radius: 8px;
+              font-size: 12px;
+              font-weight: 600;
               cursor: pointer;
-              transition: all 0.2s ease;
+              transition: all 0.15s ease;
+              display: inline-flex;
+              align-items: center;
+              gap: 6px;
             }
             .export-trigger-btn:hover {
               background: rgba(246, 92, 139, 0.1);
