@@ -772,11 +772,13 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
     });
   }, [job]);
 
+  const wsRef = useRef<WebSocket | null>(null);
+
   // Connect WebSocket for active jobs
   React.useEffect(() => {
     if (!activeStatuses.includes(localJob.status)) return;
+    if (wsRef.current) return;
 
-    let socket: WebSocket | null = null;
     let isMounted = true;
 
     const connectWs = async () => {
@@ -795,14 +797,14 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         const wsProtocol = apiUrl.startsWith("https") ? "wss" : "ws";
         const wsUrl = `${apiUrl.replace(/^http/, wsProtocol)}/ws/${localJob.id}?token=${token}`;
-        
-        socket = new WebSocket(wsUrl);
 
-        socket.onopen = () => {
+        wsRef.current = new WebSocket(wsUrl);
+
+        wsRef.current.onopen = () => {
           if (isMounted) setWsConnected(true);
         };
 
-        socket.onmessage = (event) => {
+        wsRef.current.onmessage = (event) => {
           if (!isMounted) return;
           try {
             const data = JSON.parse(event.data);
@@ -848,12 +850,12 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
           }
         };
 
-        socket.onerror = (err) => {
+        wsRef.current.onerror = (err) => {
           if (isMounted) setWsConnected(false);
           console.error("WebSocket error for job", localJob.id, err);
         };
 
-        socket.onclose = () => {
+        wsRef.current.onclose = () => {
           if (isMounted) setWsConnected(false);
           console.log("WebSocket closed for job", localJob.id);
         };
@@ -867,11 +869,12 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
 
     return () => {
       isMounted = false;
-      if (socket) {
-        socket.close();
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
       }
     };
-  }, [localJob.id, localJob.status]);
+  }, [localJob.id]);
 
   // Scroll logs to bottom
   React.useEffect(() => {
