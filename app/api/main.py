@@ -797,8 +797,14 @@ async def regenerate_clip_in_background(
                 raise RuntimeError("Regenerated clip could not be uploaded to cloud storage.")
         
         # Mark job as complete again
-        # Fetch fresh ref
+        # Fetch fresh ref and enforce state-machine guard
         job = db.query(Job).filter(Job.id == job_id).first()
+        if not job or job.status != 'processing' or job.stage != 'clip_regenerating':
+            print(f"REGENERATION GUARD: Job {job_id} state changed mid-regeneration (status={job.status if job else 'None'}). Aborting metadata commit.")
+            if temp_output_path and os.path.exists(temp_output_path):
+                os.remove(temp_output_path)
+            return
+
         updated_clips = []
         render_version = None
         for clip in (job.clips or []):
@@ -831,33 +837,42 @@ async def regenerate_clip_in_background(
         }))
         
     except Exception as e:
-        print("CAPTION REGENT ERROR:", e)
+        print("CAPTION REGEN ERROR:", e)
         if temp_output_path and os.path.exists(temp_output_path):
             try:
                 os.remove(temp_output_path)
             except OSError:
                 pass
-        # Failed edits must be visible as failures; do not commit edited metadata.
+
+        # Persist error state so the job never appears to succeed.
+        # Use a fresh session in case the original connection is broken.
+        error_db = SessionLocal()
         try:
-            job = db.query(Job).filter(Job.id == job_id).first()
-            if job:
-                errors = list(job.errors or [])
+            error_job = error_db.query(Job).filter(Job.id == job_id).first()
+            if error_job:
+                errors = list(error_job.errors or [])
                 errors.append({
                     "stage": "edit_failed",
                     "message": str(e)[:500],
                 })
-                job.errors = errors
-                job.status = 'error'
-                job.stage = 'edit_failed'
-                job.message = f"Failed to edit captions: {str(e)}"
-                job.progress = 100
-                db.commit()
-                await redis_async.publish(f"job_progress_{job_id}", json.dumps({
-                    'type': 'error',
-                    'message': job.message,
-                }))
-        except Exception:
-            pass
+                error_job.errors = errors
+                error_job.status = 'error'
+                error_job.stage = 'edit_failed'
+                error_job.message = f"Failed to edit captions: {str(e)[:200]}"
+                error_job.progress = 100
+                error_db.commit()
+        except Exception as db_err:
+            print(f"ERROR HANDLER DB FAILURE for job {job_id}: {db_err}")
+        finally:
+            error_db.close()
+
+        try:
+            await redis_async.publish(f"job_progress_{job_id}", json.dumps({
+                'type': 'error',
+                'message': f"Failed to edit captions: {str(e)[:200]}",
+            }))
+        except Exception as pub_err:
+            print(f"ERROR HANDLER PUBLISH FAILURE for job {job_id}: {pub_err}")
     finally:
         db.close()
 
