@@ -8,7 +8,7 @@ from app.worker.celery_app import celery_app
 from app.api.database import SessionLocal, engine, Base
 from app.api.models import Job, User
 from app.api.schema_compat import ensure_job_columns
-from app.config import GROQ_API_KEY, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, OUTPUT_DIR, STORAGE_MODE, PEXELS_API_KEY
+from app.config import CAPTION_STYLES, GROQ_API_KEY, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, OUTPUT_DIR, STORAGE_MODE, PEXELS_API_KEY
 from app.core.transcriber import transcribe
 from app.core.analyzer import analyze_transcript
 from app.core.clipper import generate_thumbnail, get_video_info, safe_create_clip
@@ -145,6 +145,8 @@ def process_video_job_impl(job_id):
         video_path = job.video_path
         provider = job.provider or DEFAULT_PROVIDER
         caption_style = job.caption_style or DEFAULT_CAPTION_STYLE
+        if caption_style not in CAPTION_STYLES:
+            raise RuntimeError(f"Invalid caption style stored in job metadata: {caption_style}")
         preset = job.preset or 'tiktok'
 
         # Check if user is Pro

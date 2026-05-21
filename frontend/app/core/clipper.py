@@ -3,8 +3,74 @@ import subprocess
 import os
 import json
 import functools
+import platform
+import shutil
+from pathlib import Path
 from app.config import CAPTION_STYLES, DEFAULT_CAPTION_STYLE, PRESETS
 from app.core.face_processor import tracker
+
+
+SAFE_FONT_FALLBACKS = {
+    "Montserrat ExtraBold": ["Montserrat", "Arial Black", "Impact", "Arial"],
+    "Montserrat Black": ["Montserrat", "Arial Black", "Impact", "Arial"],
+    "Outfit": ["Arial", "Verdana", "Tahoma", "Sans"],
+    "Komika Axis": ["Impact", "Arial Black", "Arial"],
+    "The Bold Font": ["Impact", "Arial Black", "Arial"],
+    "Segoe Script": ["Segoe UI", "Arial", "Verdana"],
+    "Inter": ["Arial", "Verdana", "Tahoma"],
+}
+COMMON_FALLBACK_FONTS = ["Arial", "Verdana", "Tahoma", "Segoe UI", "Impact", "Sans"]
+
+
+@functools.lru_cache(maxsize=64)
+def _system_font_names():
+    names = set()
+    if platform.system() == "Windows":
+        fonts_dir = Path(os.environ.get("WINDIR", "C:\\Windows")) / "Fonts"
+        if fonts_dir.is_dir():
+            for path in fonts_dir.iterdir():
+                if path.is_file():
+                    names.add(path.stem.lower())
+    else:
+        for fonts_dir in [Path("/usr/share/fonts"), Path("/usr/local/share/fonts"), Path.home() / ".fonts"]:
+            if fonts_dir.is_dir():
+                for path in fonts_dir.rglob("*"):
+                    if path.suffix.lower() in (".ttf", ".otf", ".ttc") and path.is_file():
+                        names.add(path.stem.lower())
+    return names
+
+
+def is_font_available(font_name: str) -> bool:
+    if not font_name:
+        return False
+    normalized = font_name.lower().replace(" ", "").replace("-", "").replace("_", "")
+    for font_name_text in _system_font_names():
+        candidate = font_name_text.lower().replace(" ", "").replace("-", "").replace("_", "")
+        if normalized in candidate or candidate in normalized:
+            return True
+    fc_list = shutil.which("fc-list")
+    if fc_list:
+        try:
+            result = subprocess.run([fc_list, ":family"], capture_output=True, text=True, timeout=4)
+            if result.returncode == 0:
+                return font_name.lower() in result.stdout.lower()
+        except Exception:
+            pass
+    return False
+
+
+def resolve_ass_font(font_name: str) -> str:
+    if not font_name:
+        return "Arial"
+    if is_font_available(font_name):
+        return font_name
+    for fallback in SAFE_FONT_FALLBACKS.get(font_name, []):
+        if is_font_available(fallback):
+            return fallback
+    for fallback in COMMON_FALLBACK_FONTS:
+        if is_font_available(fallback):
+            return fallback
+    return font_name
 
 
 @functools.lru_cache(maxsize=32)
@@ -69,9 +135,11 @@ def generate_ass_subtitles(words, clip_start, clip_end, output_path, caption_sty
     Generate ASS subtitle file with word-by-word karaoke animation.
     Now includes the Viral Hook Headline at the top.
     """
-    if caption_style is None:
+    if not caption_style:
         caption_style = DEFAULT_CAPTION_STYLE
-    style = CAPTION_STYLES.get(caption_style, CAPTION_STYLES[DEFAULT_CAPTION_STYLE])
+    if caption_style not in CAPTION_STYLES:
+        raise ValueError(f"Unsupported caption style: {caption_style}")
+    style = CAPTION_STYLES[caption_style]
 
     clip_words = [
         w for w in words
@@ -86,11 +154,14 @@ def generate_ass_subtitles(words, clip_start, clip_end, output_path, caption_sty
     if tw < th:
         video_h = tw * 9 / 16
         space_below = (th - video_h) / 2
-        margin_v = int(space_below - 120) 
+        margin_v = int(space_below - 120)
     else:
         margin_v = style.get('margin_v', 80)
     
     bold_flag = -1 if style['bold'] else 0
+    default_font = resolve_ass_font(style['font'])
+    secondary_font = resolve_ass_font(style.get('secondary_font', default_font))
+    hook_font = resolve_ass_font("Montserrat Black")
 
     ass_content = f"""[Script Info]
 Title: Clip Aura Captions
@@ -101,8 +172,8 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{style['font']},{style['fontsize']},{style['primary_color']},{style['highlight_color']},{style['outline_color']},{style['back_color']},{bold_flag},0,0,0,100,100,0,0,1,{style['outline']},{style['shadow']},{style['alignment']},40,40,{margin_v},1
-Style: Hook,Montserrat Black,80,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,10,0,8,40,40,100,1
+Style: Default,{default_font},{style['fontsize']},{style['primary_color']},{style['highlight_color']},{style['outline_color']},{style['back_color']},{bold_flag},0,0,0,100,100,0,0,1,{style['outline']},{style['shadow']},{style['alignment']},40,40,{margin_v},1
+Style: Hook,{hook_font},80,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,10,0,8,40,40,100,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -117,10 +188,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     if clip_words:
         groups = []
         current_group = []
+
+        target_group_size = 2
+        if caption_style == "hormozi":
+            target_group_size = 1
+        elif caption_style == "minimal_modern":
+            target_group_size = 3
+
         for word in clip_words:
             current_group.append(word)
             w_text = word['word'].strip()
-            if len(current_group) >= 2 or (
+            if len(current_group) >= target_group_size or (
                 len(current_group) >= 1 and w_text and w_text[-1] in '.!?,;:'
             ):
                 groups.append(current_group)
@@ -133,47 +211,71 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         EMOJIS = ["🚀", "🔥", "💎", "💰", "😱", "✅", "🛑", "👀", "🤯", "📈", "🎯", "🤫", "🦁", "👑"]
 
         for i, group in enumerate(groups):
-            if not group: continue
+            if not group:
+                continue
 
             group_start = group[0]['start'] - clip_start
             group_end = group[-1]['end'] - clip_start
-            
             if i < len(groups) - 1:
                 next_start = groups[i+1][0]['start'] - clip_start
-                display_end = min(group_end + 0.2, next_start)
+                if caption_style == "minimal_modern":
+                    display_end = min(group_end + 0.35, next_start)
+                else:
+                    display_end = min(group_end + 0.2, next_start)
             else:
-                display_end = group_end + 0.2
+                display_end = group_end + (0.35 if caption_style == "minimal_modern" else 0.2)
 
-            if group_start < 0: group_start = 0
+            if group_start < 0:
+                group_start = 0
             start_ts = format_ass_time(group_start)
             end_ts = format_ass_time(display_end)
 
             karaoke_parts = []
-            for word in group:
+            emphasis_index = 1 if caption_style == "minimal_modern" and len(group) > 1 else 0
+
+            for j, word in enumerate(group):
                 duration_cs = int((word['end'] - word['start']) * 100)
-                if duration_cs < 8: duration_cs = 8
+                if duration_cs < 8:
+                    duration_cs = 8
+
                 raw_word = word['word'].strip()
                 clean_word = raw_word.lower().strip('.,!?:;"()')
-                
+
                 if caption_style == "typography_motion":
-                    sec_font = style.get('secondary_font', 'Segoe Script')
                     if clean_word in POWER_WORDS:
                         display_word = raw_word.upper()
-                        if random.random() < 0.2: display_word += " " + random.choice(EMOJIS)
-                        part = f"{{\\fn{style['font']}}}{{\\c&H00D4FF&}}{{\\k{duration_cs}}}{display_word} "
+                        if random.random() < 0.25:
+                            display_word += " " + random.choice(EMOJIS)
+                        part = f"{{\\fn{default_font}}}{{\\c{style['primary_color']}}}{{\\k{duration_cs}}}{display_word} "
                     else:
                         display_word = raw_word.lower()
-                        part = f"{{\\fn{sec_font}}}{{\\c&HFFFFFF&}}{{\\k{duration_cs}}}{display_word} "
+                        part = f"{{\\fn{secondary_font}}}{{\\c{style['highlight_color']}}}{{\\k{duration_cs}}}{display_word} "
+                elif caption_style == "hormozi":
+                    display_word = raw_word.upper()
+                    if clean_word in POWER_WORDS and random.random() < 0.35:
+                        display_word += " " + random.choice(EMOJIS)
+                    color_tag = style['highlight_color'] if (j % 2 == 0) else style['primary_color']
+                    part = f"{{\\c{color_tag}}}{{\\k{duration_cs}}}{display_word} "
+                elif caption_style == "minimal_modern":
+                    display_word = raw_word.capitalize()
+                    color_tag = style['highlight_color'] if j == emphasis_index else style['primary_color']
+                    part = f"{{\\c{color_tag}}}{{\\k{duration_cs}}}{display_word} "
                 else:
                     display_word = raw_word.upper()
-                    if clean_word in POWER_WORDS and random.random() < 0.3: display_word += " " + random.choice(EMOJIS)
+                    if clean_word in POWER_WORDS and random.random() < 0.3:
+                        display_word += " " + random.choice(EMOJIS)
                     part = f"{{\\k{duration_cs}}}{display_word} "
-                    
+
                 karaoke_parts.append(part)
 
             text = "".join(karaoke_parts).strip()
-            # Professional Bouncy Animation: Pop in, slight overshoot, then settle
-            animation = f"{{\\an{style['alignment']}\\fad(50,50)\\t(0,80,\\fscx120\\fscy120)\\t(80,160,\\fscx100\\fscy100)}}"
+            if caption_style == "hormozi":
+                animation = f"{{\\an{style['alignment']}\\fad(80,80)\\t(0,120,\\fscx110\\fscy110)\\t(120,240,\\fscx100\\fscy100)}}"
+            elif caption_style == "minimal_modern":
+                animation = f"{{\\an{style['alignment']}\\fad(180,180)}}"
+            else:
+                animation = f"{{\\an{style['alignment']}\\fad(50,50)\\t(0,80,\\fscx120\\fscy120)\\t(80,160,\\fscx100\\fscy100)}}"
+
             ass_content += f"Dialogue: 0,{start_ts},{end_ts},Default,,0,0,0,,{animation}{text}\n"
 
     with open(output_path, 'w', encoding='utf-8') as f:

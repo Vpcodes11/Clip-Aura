@@ -379,8 +379,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                         className="stealth-select"
                       >
                         <option value="typography_motion">Karaoke Pop (Dynamic)</option>
-                        <option value="cursive_caps">Cursive + CAPS</option>
-                        <option value="standard_caption">Standard Block</option>
+                        <option value="hormozi">Hormozi Bold</option>
+                        <option value="minimal_modern">Cinematic Minimal</option>
                       </select>
                     </div>
 

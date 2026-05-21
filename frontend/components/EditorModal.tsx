@@ -370,19 +370,19 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                       className={`pill ${captionStyle === 'typography_motion' ? 'active' : ''}`}
                       onClick={() => setCaptionStyle('typography_motion')}
                     >
-                      <Type size={13} /> Karaoke
+                      <Type size={13} /> Karaoke Pop
                     </button>
                     <button
-                      className={`pill ${captionStyle === 'cursive_caps' ? 'active' : ''}`}
-                      onClick={() => setCaptionStyle('cursive_caps')}
+                      className={`pill ${captionStyle === 'hormozi' ? 'active' : ''}`}
+                      onClick={() => setCaptionStyle('hormozi')}
                     >
-                      Cursive
+                      <Sparkles size={13} /> Hormozi Bold
                     </button>
                     <button
-                      className={`pill ${captionStyle === 'standard_caption' ? 'active' : ''}`}
-                      onClick={() => setCaptionStyle('standard_caption')}
+                      className={`pill ${captionStyle === 'minimal_modern' ? 'active' : ''}`}
+                      onClick={() => setCaptionStyle('minimal_modern')}
                     >
-                      Standard
+                      <Monitor size={13} /> Cinematic Minimal
                     </button>
                   </div>
                   <div className="pill-group">

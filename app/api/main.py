@@ -36,6 +36,15 @@ from app.api import payments
 Base.metadata.create_all(bind=engine)
 ensure_job_columns(engine)
 
+
+def validate_caption_style(caption_style: Optional[str]) -> str:
+    if not caption_style:
+        return DEFAULT_CAPTION_STYLE
+    if caption_style not in CAPTION_STYLES:
+        raise HTTPException(status_code=400, detail=f"Unsupported caption style: {caption_style}")
+    return caption_style
+
+
 app = FastAPI(title="Clip Aura — AI Video Clipper")
 
 # Security Constraints
@@ -353,6 +362,7 @@ async def upload_video(
 
     if not provider:
         provider = DEFAULT_PROVIDER
+    caption_style = validate_caption_style(caption_style)
     job_id = str(uuid.uuid4())[:8]
     job_dir = UPLOAD_DIR / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
@@ -907,6 +917,7 @@ async def edit_clip(
     words_list = [{'word': w.word, 'start': w.start, 'end': w.end} for w in req.words]
     
     caption_style = req.caption_style or job.caption_style
+    caption_style = validate_caption_style(caption_style)
     preset = req.preset or job.preset
     is_pro = user.subscription_tier == "pro"
 
