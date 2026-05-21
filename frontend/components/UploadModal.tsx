@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Loader2, X, Upload, Link as LinkIcon, Sparkles, Smartphone, Monitor, Square as SquareIcon, Check, ChevronRight, ArrowLeft } from 'lucide-react';
+import { CheckCircle2, Loader2, X, Upload, Link as LinkIcon, Sparkles, Smartphone, Monitor, Square as SquareIcon, Check } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/supabase';
 
 interface UploadModalProps {
@@ -12,7 +12,6 @@ interface UploadModalProps {
 }
 
 export default function UploadModal({ isOpen, onClose, onUploadStarted }: UploadModalProps) {
-  const [step, setStep] = useState<1 | 2>(1);
   const [activeTab, setActiveTab] = useState<'upload' | 'url'>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [url, setUrl] = useState('');
@@ -21,10 +20,13 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Step 2 configuration states
+  // Configuration states
   const [selectedPreset, setSelectedPreset] = useState('tiktok');
   const [selectedStyle, setSelectedStyle] = useState('typography_motion');
   const [enableHookOpt, setEnableHookOpt] = useState(true);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [step, setStep] = useState(1);
 
   // Dynamic configurations fetched from API
   const [presetsList, setPresetsList] = useState<Record<string, any>>({
@@ -71,29 +73,26 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
   // Reset modal state on open/close
   useEffect(() => {
     if (isOpen) {
-      setStep(1);
       setFile(null);
       setUrl('');
       setError(null);
+      setShowAdvanced(false);
+      setStep(1);
     }
   }, [isOpen]);
 
-  const handleContinue = () => {
+  const handleUpload = async () => {
+    setError(null);
     if (activeTab === 'upload' && !file) {
-      setError('Please select an intelligence asset to upload.');
+      setError('Please select a video to upload.');
       return;
     }
     if (activeTab === 'url' && !url) {
-      setError('Please paste a valid YouTube or video link.');
+      setError('Please paste a YouTube or video link.');
       return;
     }
-    setError(null);
-    setStep(2);
-  };
-
-  const handleUpload = async () => {
-    setError(null);
     setIsUploading(true);
+    setUploadProgress(0);
     try {
       const formData = new FormData();
       if (activeTab === 'upload' && file) {
@@ -106,25 +105,54 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
       formData.append('caption_style', selectedStyle);
  
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await authenticatedFetch(`${apiUrl}/api/upload`, {
-        method: 'POST',
-        body: formData,
+
+      const data = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${apiUrl}/api/upload`);
+
+        const token = localStorage.getItem('sb-access-token');
+        if (token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        }
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            setUploadProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch {
+              resolve({});
+            }
+          } else {
+            try {
+              const err = JSON.parse(xhr.responseText);
+              reject(new Error(err.detail || 'Upload failed'));
+            } catch {
+              reject(new Error('Upload failed'));
+            }
+          }
+        });
+
+        xhr.addEventListener('error', () => reject(new Error('Network error during upload.')));
+        xhr.addEventListener('abort', () => reject(new Error('Upload cancelled.')));
+
+        xhr.send(formData);
       });
- 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Upload failed');
-      }
-      
-      const data = await response.json();
+
       console.log('Job started:', data.job_id);
       onUploadStarted?.();
       onClose();
     } catch (error) {
       console.error(error);
-      setError(error instanceof Error ? error.message : 'Failed to start intelligence pipeline.');
+      setError(error instanceof Error ? error.message : 'Upload failed. Please try again.');
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -141,6 +169,8 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
     setError(null);
   };
 
+  const isNextDisabled = activeTab === 'upload' ? !file : !url.trim();
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -155,16 +185,14 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
             <div className="modal-header">
               <div className="modal-title">
                 <Sparkles size={18} className="text-accent" />
-                <h2>New Project Wizard</h2>
+                <h2>Generate Shorts</h2>
+              </div>
+              <div className="step-indicator-bar">
+                <div className={`step-dot ${step === 1 ? 'active' : ''}`}>1</div>
+                <div className="step-line"></div>
+                <div className={`step-dot ${step === 2 ? 'active' : ''}`}>2</div>
               </div>
               <button onClick={onClose} className="close-btn" disabled={isUploading}><X size={20} /></button>
-            </div>
-
-            {/* Step Indicators */}
-            <div className="step-indicator-bar">
-              <div className={`step-dot ${step >= 1 ? 'active' : ''}`}>1</div>
-              <div className="step-line" />
-              <div className={`step-dot ${step >= 2 ? 'active' : ''}`}>2</div>
             </div>
 
             {step === 1 ? (
@@ -214,13 +242,13 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
                         <div className="file-selected">
                           <div className="selected-icon"><CheckCircle2 size={22} /></div>
                           <span>{file.name}</span>
-                          <small>{(file.size / (1024 * 1024)).toFixed(1)} MB ready to process</small>
+                          <small>{(file.size / (1024 * 1024)).toFixed(1)} MB ready</small>
                         </div>
                       ) : (
                         <>
                           <Upload size={32} className="text-muted" />
-                          <p>Drag intelligence assets or click to browse</p>
-                          <span className="text-muted text-xs">Supports MP4, MOV up to 2GB</span>
+                          <p>Drop a video here or tap to browse</p>
+                          <span className="text-muted text-xs">MP4, MOV, or WEBM up to 2 GB</span>
                         </>
                       )}
                     </div>
@@ -237,143 +265,156 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
                         className="stealth-input"
                         disabled={isUploading}
                       />
-                      <small className="text-muted text-xs block mt-2 px-1">Paste standard video files or YouTube URLs to import.</small>
+                      <small className="text-muted text-xs block mt-2 px-1">Paste a YouTube link or direct video URL.</small>
                     </div>
                   )}
-                </div>
-
-                <div className="modal-footer">
-                  <AnimatePresence>
-                    {error && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: -6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        className="error-message-tooltip font-semibold text-xs"
-                      >
-                        {error}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  <button 
-                    className="glow-button w-full" 
-                    onClick={handleContinue}
-                  >
-                    Continue to Configuration <ChevronRight size={16} className="ml-1" />
-                  </button>
                 </div>
               </>
             ) : (
-              <>
-                <div className="modal-body step-2-body">
-                  <h3 className="section-title">Configure Ingest Parameters</h3>
-                  
-                  {/* Preset layout grids */}
-                  <div className="presets-grid">
-                    {Object.entries(presetsList).map(([key, value]) => {
-                      const isSelected = selectedPreset === key;
-                      const label = value.label || key;
-                      let aspectIcon = <Smartphone size={16} />;
-                      if (key === 'landscape') aspectIcon = <Monitor size={16} />;
-                      if (key === 'square') aspectIcon = <SquareIcon size={16} />;
+              <div className="modal-body presets-section">
+                <h3 className="section-title">Select Video Layout</h3>
+                
+                {/* Preset layout grids */}
+                <div className="presets-grid">
+                  {Object.entries(presetsList).map(([key, value]) => {
+                    const isSelected = selectedPreset === key;
+                    const label = value.label || key;
+                    let aspectIcon = <Smartphone size={16} />;
+                    if (key === 'landscape') aspectIcon = <Monitor size={16} />;
+                    if (key === 'square') aspectIcon = <SquareIcon size={16} />;
 
-                      return (
-                        <div 
-                          key={key} 
-                          className={`preset-card ${isSelected ? 'active' : ''}`}
-                          onClick={() => setSelectedPreset(key)}
-                        >
-                          <div className="preset-card-glow" />
-                          <span className="preset-icon">{aspectIcon}</span>
-                          <span className="preset-label">{label.split(" (")[0]}</span>
-                          <span className="preset-sub">{label.includes(" (") ? `(${label.split(" (")[1]}` : ''}</span>
-                          {isSelected && <span className="selected-badge"><Check size={10} /></span>}
+                    return (
+                      <div 
+                        key={key} 
+                        className={`preset-card ${isSelected ? 'active' : ''}`}
+                        onClick={() => setSelectedPreset(key)}
+                      >
+                        <div className="preset-card-glow" />
+                        <span className="preset-icon">{aspectIcon}</span>
+                        <span className="preset-label">{label.split(" (")[0]}</span>
+                        <span className="preset-sub">{label.includes(" (") ? `(${label.split(" (")[1]}` : ''}</span>
+                        {isSelected && <span className="selected-badge"><Check size={10} /></span>}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Advanced Settings Toggle */}
+                <div className="advanced-toggle-wrapper mt-4">
+                  <button 
+                    type="button"
+                    className="advanced-toggle-btn"
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                  >
+                    {showAdvanced ? "Hide advanced settings" : "Show advanced settings"}
+                  </button>
+                </div>
+
+                {/* Progressive Disclosure Section */}
+                <AnimatePresence>
+                  {showAdvanced && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="advanced-settings-content mt-2"
+                      style={{ overflow: 'hidden' }}
+                    >
+                      {/* Caption Styles Selection */}
+                      <div className="style-selection-box mt-2">
+                        <label className="input-label">Subtitle Caption Style</label>
+                        <div className="select-container">
+                          <select 
+                            value={selectedStyle}
+                            onChange={(e) => setSelectedStyle(e.target.value)}
+                            className="stealth-select-styled"
+                          >
+                            {Object.entries(stylesList).map(([key, val]) => (
+                              <option key={key} value={key}>
+                                {val.name || key.replace('_', ' ').toUpperCase()}
+                              </option>
+                            ))}
+                          </select>
                         </div>
-                      );
-                    })}
-                  </div>
+                      </div>
 
-                  {/* Caption Styles Selection */}
-                  <div className="style-selection-box mt-4">
-                    <label className="input-label">Subtitle Caption Style</label>
-                    <div className="select-container">
-                      <select 
-                        value={selectedStyle}
-                        onChange={(e) => setSelectedStyle(e.target.value)}
-                        className="stealth-select-styled"
-                      >
-                        {Object.entries(stylesList).map(([key, val]) => (
-                          <option key={key} value={key}>
-                            {val.name || key.replace('_', ' ').toUpperCase()}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Hook optimization checkbox */}
-                  <label className="checkbox-container mt-4">
-                    <input 
-                      type="checkbox" 
-                      checked={enableHookOpt} 
-                      onChange={(e) => setEnableHookOpt(e.target.checked)} 
-                    />
-                    <span className="checkbox-custom" />
-                    <div className="checkbox-text">
-                      <span>Enable AI Hook Optimization</span>
-                      <small>Semantic clustering algorithms locate the highest score video hooks.</small>
-                    </div>
-                  </label>
-                </div>
-
-                <div className="modal-footer">
-                  <AnimatePresence>
-                    {error && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: -6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        className="error-message-tooltip font-semibold text-xs"
-                      >
-                        {error}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  
-                  {isUploading && (
-                    <div className="upload-progress">
-                      <span><Loader2 className="spin" size={14} /> Securing project assets</span>
-                      <i />
-                    </div>
+                      {/* Hook optimization checkbox */}
+                      <label className="checkbox-container mt-4">
+                        <input 
+                          type="checkbox" 
+                          checked={enableHookOpt} 
+                          onChange={(e) => setEnableHookOpt(e.target.checked)} 
+                        />
+                        <span className="checkbox-custom" />
+                        <div className="checkbox-text">
+                          <span>Enable AI Hook Optimization</span>
+                          <small>Find stronger hook moments before rendering.</small>
+                        </div>
+                      </label>
+                    </motion.div>
                   )}
-
-                  <div className="flex gap-3 w-full">
-                    <button 
-                      className="reset-btn glass-btn" 
-                      onClick={() => setStep(1)}
-                      disabled={isUploading}
-                    >
-                      <ArrowLeft size={16} /> Back
-                    </button>
-                    <button 
-                      className="glow-button flex-1" 
-                      disabled={isUploading}
-                      onClick={handleUpload}
-                    >
-                      {isUploading ? (
-                        <>
-                          <Loader2 className="spin" size={16} /> Starting...
-                        </>
-                      ) : (
-                        <>
-                          Deploy Pipeline <Sparkles size={14} className="ml-1" />
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </>
+                </AnimatePresence>
+              </div>
             )}
+
+            <div className="modal-footer">
+              <AnimatePresence>
+                {error && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="error-message-tooltip font-semibold text-xs"
+                  >
+                    {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              
+              {isUploading && (
+                <div className="upload-progress">
+                  <span><Loader2 className="spin" size={14} /> Uploading and starting pipeline</span>
+                  <i />
+                </div>
+              )}
+
+              {step === 1 ? (
+                <div className="flex gap-3 w-full">
+                  <button 
+                    className="glow-button flex-1" 
+                    disabled={isNextDisabled}
+                    onClick={() => setStep(2)}
+                  >
+                    Next: Configure Layout ⚡
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-3 w-full">
+                  <button 
+                    className="reset-btn glass-btn" 
+                    disabled={isUploading}
+                    onClick={() => setStep(1)}
+                  >
+                    Back
+                  </button>
+                  <button 
+                    className="glow-button flex-1" 
+                    disabled={isUploading}
+                    onClick={handleUpload}
+                  >
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="spin" size={16} /> Starting pipeline
+                      </>
+                    ) : (
+                      <>
+                        Generate Clips ⚡
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
 
             <style jsx>{`
               .modal-overlay {
@@ -825,6 +866,29 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
                 background: rgba(255, 255, 255, 0.08);
                 color: #fff;
                 border-color: rgba(255, 255, 255, 0.12);
+              }
+              .advanced-toggle-btn {
+                background: rgba(255, 255, 255, 0.03);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                color: var(--muted-strong);
+                width: 100%;
+                padding: 12px 14px;
+                border-radius: 10px;
+                font-size: 12px;
+                font-weight: 700;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+              }
+              .advanced-toggle-btn:hover {
+                background: rgba(255, 255, 255, 0.06);
+                border-color: rgba(255, 255, 255, 0.15);
+                color: #ffffff;
+              }
+              .advanced-settings-content {
+                width: 100%;
               }
 
               @media (max-width: 640px) {

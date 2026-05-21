@@ -3,8 +3,9 @@
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Download, ExternalLink, FileVideo, Loader2, Plus, Search, Share2 } from "lucide-react";
+import { ExternalLink, FileVideo, Loader2, Play, Plus, Search, Share2 } from "lucide-react";
 import EditorModal from "@/components/EditorModal";
+import ExportModal from "@/components/ExportModal";
 import type { Clip } from "@/components/EditorModal";
 import { authenticatedFetch } from "@/lib/supabase";
 
@@ -39,7 +40,6 @@ function ClipSkeletonGrid() {
             <div className="skeleton-actions">
               <span className="skeleton-button shimmer" />
               <span className="skeleton-square shimmer" />
-              <span className="skeleton-square shimmer" />
             </div>
           </div>
         </article>
@@ -52,10 +52,10 @@ export default function ClipsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [query, setQuery] = useState("");
   const [activeEditorClip, setActiveEditorClip] = useState<{ jobId: string; clip: Clip; clipIndex: number } | null>(null);
+  const [activeExportClip, setActiveExportClip] = useState<{ jobId: string; clip: Clip; clipIndex: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [shareMessage, setShareMessage] = useState<string | null>(null);
-  const [downloadingClip, setDownloadingClip] = useState<string | null>(null);
+  const [shareMessage] = useState<string | null>(null);
 
   const fetchJobs = React.useCallback(async () => {
     setError(null);
@@ -102,36 +102,16 @@ export default function ClipsPage() {
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  const handleShare = async (clip: ClipWithJob) => {
-    const previewUrl = `${apiUrl}/api/preview/${clip.jobId}/${clip.filename}`;
-    setShareMessage(null);
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: clip.title,
-          text: clip.hook_caption || clip.title,
-          url: previewUrl,
-        });
-        setShareMessage("Share sheet opened.");
-      } else {
-        await navigator.clipboard.writeText(previewUrl);
-        setShareMessage("Clip link copied.");
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      console.error("Failed to share clip:", err);
-      setShareMessage("Could not share this clip.");
+  const showEmptyState = !isLoading && clips.length === 0;
+  const showNoSearchResults = !isLoading && clips.length > 0 && filteredClips.length === 0;
+
+  const togglePreviewPlayback = (video: HTMLVideoElement) => {
+    if (video.paused) {
+      video.play().catch(() => undefined);
+    } else {
+      video.pause();
     }
   };
-
-  const handleDownload = (clip: ClipWithJob) => {
-    const downloadKey = `${clip.jobId}-${clip.filename}`;
-    setDownloadingClip(downloadKey);
-    window.open(`${apiUrl}/api/download/${clip.jobId}/${clip.filename}`, "_blank", "noopener,noreferrer");
-    window.setTimeout(() => setDownloadingClip((current) => (current === downloadKey ? null : current)), 1200);
-  };
-
-  const showEmptyState = !isLoading && clips.length === 0;
 
   return (
     <div className="clips-page">
@@ -143,6 +123,15 @@ export default function ClipsPage() {
         clip={activeEditorClip?.clip || null}
         clipIndex={activeEditorClip?.clipIndex ?? 0}
         onSaveSuccess={fetchJobs}
+      />
+
+      <ExportModal
+        key={activeExportClip?.clip?.filename || "export-none"}
+        isOpen={activeExportClip !== null}
+        onClose={() => setActiveExportClip(null)}
+        jobId={activeExportClip?.jobId || ""}
+        clip={activeExportClip?.clip || null}
+        clipIndex={activeExportClip?.clipIndex ?? 0}
       />
 
       <section className="clips-hero">
@@ -174,6 +163,12 @@ export default function ClipsPage() {
             Create a project
           </Link>
         </div>
+      ) : showNoSearchResults ? (
+        <div className="empty-space compact">
+          <Search size={28} />
+          <h2>No matching clips</h2>
+          <p>Try a different title, hook, or source search.</p>
+        </div>
       ) : (
         <section className="clip-grid">
           {filteredClips.map((clip, index) => (
@@ -191,23 +186,30 @@ export default function ClipsPage() {
                   playsInline
                   onMouseOver={(event) => event.currentTarget.play()}
                   onMouseOut={(event) => event.currentTarget.pause()}
+                  onClick={(event) => togglePreviewPlayback(event.currentTarget)}
                 />
+                <div className="play-badge-overlay">
+                  <Play size={22} className="play-icon" fill="currentColor" />
+                </div>
                 {clip.virality_score > 0 && <span className="score">{clip.virality_score}</span>}
                 {clip.duration && <span className="duration">{formatDuration(clip.duration)}</span>}
               </div>
 
               <div className="body">
                 <h3>{clip.title}</h3>
+                <div className="clip-meta">
+                  {clip.virality_score > 0 && <span>Score {clip.virality_score}</span>}
+                  {clip.duration && <span>{formatDuration(clip.duration)}</span>}
+                  <span>Clip {clip.clipIndex + 1}</span>
+                </div>
                 <div className="actions">
-                  <button onClick={() => setActiveEditorClip({ jobId: clip.jobId, clip, clipIndex: clip.clipIndex })}>
-                    <ExternalLink size={15} />
+                  <button onClick={() => setActiveEditorClip({ jobId: clip.jobId, clip, clipIndex: clip.clipIndex })} className="edit-btn">
+                    <ExternalLink size={14} />
                     Edit
                   </button>
-                  <button onClick={() => handleDownload(clip)} disabled={downloadingClip === `${clip.jobId}-${clip.filename}`}>
-                    {downloadingClip === `${clip.jobId}-${clip.filename}` ? <Loader2 className="spin" size={15} /> : <Download size={15} />}
-                  </button>
-                  <button onClick={() => handleShare(clip)}>
-                    <Share2 size={15} />
+                  <button onClick={() => setActiveExportClip({ jobId: clip.jobId, clip, clipIndex: clip.clipIndex })} className="export-btn">
+                    <Share2 size={14} />
+                    Export
                   </button>
                 </div>
               </div>
@@ -299,12 +301,13 @@ export default function ClipsPage() {
         .clip-card {
           border-radius: 18px;
           overflow: hidden;
-          transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+          transition: transform 0.25s cubic-bezier(0.25, 0.8, 0.25, 1), border-color 0.25s ease, box-shadow 0.25s ease;
         }
 
         .clip-card:hover {
-          transform: translateY(-2px);
-          border-color: rgba(6, 182, 212, 0.28);
+          transform: translateY(-4px) scale(1.02);
+          border-color: var(--accent);
+          box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
         }
 
         .preview {
@@ -319,6 +322,39 @@ export default function ClipsPage() {
           height: 100%;
           object-fit: cover;
           display: block;
+          transition: transform 0.3s ease;
+          cursor: pointer;
+        }
+
+        .clip-card:hover .preview video {
+          transform: scale(1.06);
+        }
+
+        .play-badge-overlay {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: rgba(0, 0, 0, 0.3);
+          opacity: 0;
+          transition: opacity 0.25s ease, background-color 0.25s ease;
+          pointer-events: none;
+          z-index: 2;
+        }
+
+        .clip-card:hover .play-badge-overlay {
+          opacity: 1;
+        }
+
+        .play-icon {
+          color: #ffffff;
+          transform: scale(0.8);
+          transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .clip-card:hover .play-icon {
+          transform: scale(1.1);
         }
 
         .score,
@@ -358,6 +394,25 @@ export default function ClipsPage() {
           overflow: hidden;
         }
 
+        .clip-meta {
+          min-height: 18px;
+          margin-top: 7px;
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          flex-wrap: wrap;
+          color: var(--muted);
+          font-size: 11px;
+          font-weight: 700;
+        }
+
+        .clip-meta span {
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
         .actions {
           display: flex;
           gap: 8px;
@@ -365,6 +420,7 @@ export default function ClipsPage() {
         }
 
         .actions button {
+          flex: 1;
           min-height: 34px;
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 10px;
@@ -378,17 +434,14 @@ export default function ClipsPage() {
           font-size: 12px;
           font-weight: 750;
           cursor: pointer;
+          transition: all 0.2s ease;
           touch-action: manipulation;
-        }
-
-        .actions button:first-child {
-          flex: 1;
         }
 
         .actions button:hover {
           color: #ffffff;
-          border-color: rgba(6, 182, 212, 0.28);
-          background: rgba(6, 182, 212, 0.1);
+          border-color: var(--accent);
+          background: rgba(246, 92, 139, 0.1);
         }
 
         .empty-space {
@@ -401,6 +454,10 @@ export default function ClipsPage() {
           gap: 10px;
           text-align: center;
           color: var(--muted);
+        }
+
+        .empty-space.compact {
+          min-height: 260px;
         }
 
         .clip-skeleton {
@@ -510,6 +567,19 @@ export default function ClipsPage() {
           .clip-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 12px;
+          }
+
+          .clip-card:hover {
+            transform: none;
+          }
+
+          .clip-card:hover .preview video {
+            transform: none;
+          }
+
+          .play-badge-overlay {
+            opacity: 1;
+            background: rgba(0, 0, 0, 0.18);
           }
 
           .body {
