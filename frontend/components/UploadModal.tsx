@@ -114,7 +114,13 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${apiUrl}/api/upload`);
 
-        const token = localStorage.getItem('sb-access-token');
+        const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE !== 'false';
+        let token: string | null = null;
+        if (isDevMode) {
+          token = 'dev-token';
+        } else {
+          token = localStorage.getItem('sb-access-token');
+        }
         if (token) {
           xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         }

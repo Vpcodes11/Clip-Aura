@@ -127,14 +127,18 @@ app.include_router(payments.router)
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 redis_async = redis.from_url(REDIS_URL)
 
-# Serve static files
-app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+# Serve static files (Disabled for decoupled architecture)
+# app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
 
 @app.get("/")
 async def root():
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    return RedirectResponse(url=frontend_url)
+    return {
+        "name": "Clip Aura API",
+        "version": "1.0.0",
+        "status": "healthy",
+        "docs_url": "/docs"
+    }
 
 
 @app.get("/api/health")

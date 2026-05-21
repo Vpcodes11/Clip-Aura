@@ -10,6 +10,7 @@ from app.api.auth import get_current_user
 
 stripe.api_key = STRIPE_SECRET_KEY
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 redis_async = redis.from_url(REDIS_URL)
 
@@ -63,8 +64,8 @@ async def create_checkout_session(user: User = Depends(get_current_user)):
                 },
             ],
             mode='subscription',
-            success_url=f"{BASE_URL}/static/index.html?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{BASE_URL}/static/index.html",
+            success_url=f"{FRONTEND_URL}/dashboard?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{FRONTEND_URL}/dashboard/billing",
             metadata={
                 'user_id': user.id
             }

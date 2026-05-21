@@ -33,7 +33,7 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -43,15 +43,15 @@ export default function LoginPage() {
         if (error) throw error;
         setSuccessMsg("Verification link sent! Check your inbox.");
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
         router.push("/dashboard");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "An authentication error occurred.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "An authentication error occurred.");
     } finally {
       setLoading(false);
     }
@@ -68,8 +68,8 @@ export default function LoginPage() {
         },
       });
       if (error) throw error;
-    } catch (err: any) {
-      setErrorMsg(err.message || "Google login failed.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Google login failed.");
       setLoading(false);
     }
   };

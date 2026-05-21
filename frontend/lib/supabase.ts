@@ -6,7 +6,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOi
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
-  const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+  const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE !== 'false';
   
   let accessToken = 'dev-token';
   
@@ -20,10 +20,7 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
     accessToken = session.access_token;
   }
   
-  const headers = {
-    ...options.headers,
-    'Authorization': `Bearer ${accessToken}`,
-  };
+  const headers = { ...options.headers, 'Authorization': `Bearer ${accessToken}` };
 
   return fetch(url, { ...options, headers });
 };

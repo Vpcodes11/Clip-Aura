@@ -10,7 +10,6 @@ import {
   Plus,
   Search,
   Trash2,
-  UploadCloud,
   ChevronDown,
   ChevronUp,
   Terminal,
@@ -35,9 +34,15 @@ function projectName(job: Job) {
   if (!job.source) return `Project ${job.id}`;
   try {
     const url = new URL(job.source);
-    return url.hostname.replace(/^www\./, "") + url.pathname;
+    const host = url.hostname.replace(/^www\./, "");
+    if (host.includes("youtube.com") || host.includes("youtu.be")) {
+      const videoId = url.searchParams.get("v") || url.pathname.split("/").filter(Boolean).pop() || "";
+      return videoId ? `YouTube / ${videoId}` : "YouTube video";
+    }
+    const path = url.pathname.replace(/\/$/, "").split("/").pop() || "";
+    return path ? `${host} / ${decodeURIComponent(path)}` : host;
   } catch {
-    return job.source;
+    return job.source.length > 50 ? job.source.slice(0, 47) + "..." : job.source;
   }
 }
 
@@ -139,8 +144,6 @@ export default function Dashboard() {
     return `${job.id} ${job.source || ""} ${job.status}`.toLowerCase().includes(needle);
   });
 
-  const showEmptyState = !isLoading && jobs.length === 0;
-
   return (
     <div className="clean-dashboard">
       <UploadModal isOpen={isUploadOpen} onClose={() => setIsUploadOpen(false)} onUploadStarted={fetchJobs} />
@@ -155,21 +158,6 @@ export default function Dashboard() {
           Generate Shorts
         </button>
       </section>
-
-      {showEmptyState ? (
-        <section className="empty-guide">
-          <div className="empty-guide-card upload" onClick={() => setIsUploadOpen(true)}>
-            <UploadCloud size={28} />
-            <h2>Upload a video</h2>
-            <p>MP4, MOV, or WEBM — up to 2 GB</p>
-          </div>
-          <div className="empty-guide-card url" onClick={() => setIsUploadOpen(true)}>
-            <Plus size={28} />
-            <h2>Paste a link</h2>
-            <p>YouTube, Vimeo, or any public video URL</p>
-          </div>
-        </section>
-      ) : (
         <section className="project-panel">
           <div className="panel-top">
             <div>
@@ -206,7 +194,6 @@ export default function Dashboard() {
             ))}
           </div>
         </section>
-      )}
 
       <style jsx>{`
         .clean-dashboard {
@@ -317,8 +304,8 @@ export default function Dashboard() {
         }
 
         .panel-top {
-          padding: 24px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+          padding: 28px 28px 24px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
           display: flex;
           align-items: center;
           justify-content: space-between;
@@ -327,10 +314,12 @@ export default function Dashboard() {
         }
 
         .panel-top h2 {
-          font-size: 18px;
+          font-size: 16px;
+          font-weight: 600;
           display: flex;
           align-items: center;
           gap: 10px;
+          color: var(--muted-strong);
         }
 
         .active-badge,
@@ -393,13 +382,13 @@ export default function Dashboard() {
 
         .project-row {
           display: grid;
-          grid-template-columns: minmax(220px, 1fr) 220px auto;
-          gap: 16px;
+          grid-template-columns: minmax(280px, 1fr) 100px 90px auto;
+          gap: 20px;
           align-items: center;
-          min-height: 72px;
-          padding: 16px 24px;
-          border-top: 1px solid rgba(255, 255, 255, 0.07);
-          transition: background 0.18s ease, transform 0.18s ease;
+          min-height: 88px;
+          padding: 20px 28px;
+          border-top: 1px solid rgba(255, 255, 255, 0.04);
+          transition: background 0.18s ease;
         }
 
         .project-row:hover {
@@ -409,7 +398,7 @@ export default function Dashboard() {
         .source-cell {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 14px;
           min-width: 0;
         }
 
@@ -437,7 +426,9 @@ export default function Dashboard() {
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          font-size: 14px;
+          font-size: 15px;
+          font-weight: 600;
+          margin-bottom: 4px;
         }
 
         .source-cell small {
@@ -459,18 +450,23 @@ export default function Dashboard() {
           width: fit-content;
         }
 
-        .meta-cell {
+        .status-cell {
           display: flex;
+          justify-content: center;
+        }
+
+        .clips-cell {
+          display: flex;
+          justify-content: center;
           align-items: center;
-          gap: 12px;
         }
 
         .status-pill {
           border-radius: 999px;
-          padding: 4px 8px;
+          padding: 5px 10px;
           font-size: 12px;
-          font-weight: 800;
-          background: rgba(255, 255, 255, 0.06);
+          font-weight: 650;
+          background: rgba(255, 255, 255, 0.05);
           color: var(--muted-strong);
           white-space: nowrap;
         }
@@ -492,7 +488,7 @@ export default function Dashboard() {
         .clip-badge {
           color: var(--muted);
           font-size: 12px;
-          font-weight: 650;
+          font-weight: 550;
           white-space: nowrap;
         }
 
@@ -515,13 +511,13 @@ export default function Dashboard() {
           display: flex;
           align-items: center;
           justify-content: flex-end;
-          gap: 8px;
+          gap: 10px;
         }
 
         .row-actions a {
-          min-height: 32px;
+          min-height: 36px;
           border-radius: 9px;
-          padding: 0 10px;
+          padding: 0 14px;
           background: rgba(255, 255, 255, 0.08);
           text-decoration: none;
           font-size: 12px;
@@ -568,9 +564,9 @@ export default function Dashboard() {
           grid-template-columns: 36px minmax(0, 1fr) 92px;
           gap: 14px;
           align-items: center;
-          min-height: 74px;
-          padding: 16px 24px;
-          border-top: 1px solid rgba(255, 255, 255, 0.07);
+          min-height: 88px;
+          padding: 20px 28px;
+          border-top: 1px solid rgba(255, 255, 255, 0.04);
         }
 
         .skeleton-dot {
@@ -632,16 +628,25 @@ export default function Dashboard() {
 
         @media (max-width: 860px) {
           .project-row {
-            grid-template-columns: 1fr;
-            gap: 12px;
-            padding: 18px;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            padding: 20px;
           }
 
-          .meta-cell {
-            flex-wrap: wrap;
+          .source-cell {
+            grid-column: 1 / -1;
+          }
+
+          .status-cell {
+            justify-content: flex-start;
+          }
+
+          .clips-cell {
+            justify-content: flex-start;
           }
 
           .row-actions {
+            grid-column: 1 / -1;
             justify-content: stretch;
           }
 
@@ -658,7 +663,7 @@ export default function Dashboard() {
 
           .project-skeleton {
             grid-template-columns: 36px minmax(0, 1fr);
-            padding: 18px;
+            padding: 20px;
           }
 
           .skeleton-pill {
@@ -690,7 +695,7 @@ export default function Dashboard() {
           .panel-top {
             flex-direction: column;
             align-items: stretch;
-            padding: 18px;
+            padding: 22px;
           }
 
           .panel-top h2 {
@@ -719,8 +724,9 @@ export default function Dashboard() {
             -webkit-box-orient: vertical;
           }
 
-          .meta-cell {
-            gap: 8px;
+          .status-cell,
+          .clips-cell {
+            justify-content: flex-start;
           }
         }
 
@@ -781,7 +787,7 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
 
     const connectWs = async () => {
       try {
-        const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+        const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE !== 'false';
         let token = 'dev-token';
         if (!isDevMode) {
           const { data: { session } } = await supabase.auth.getSession();
@@ -951,12 +957,17 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
             )}
           </div>
         </div>
-        <div className="meta-cell">
+        <div className="status-cell">
           <span className={`status-pill ${localJob.status}`}>{statusLabel(localJob.status)}</span>
-          <span className="clip-badge">{localJob.clips?.length || 0} clip{(localJob.clips?.length || 0) !== 1 ? "s" : ""}</span>
-          <div className="progress-bar">
-            <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
-          </div>
+        </div>
+        <div className="clips-cell">
+          {activeStatuses.includes(localJob.status) ? (
+            <div className="progress-bar">
+              <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+            </div>
+          ) : (
+            <span className="clip-badge">{localJob.clips?.length || 0} clip{(localJob.clips?.length || 0) !== 1 ? "s" : ""}</span>
+          )}
         </div>
         <div className="row-actions">
           {localJob.status === "complete" && <Link href={`/dashboard/clips?job=${localJob.id}`}>View clips</Link>}
@@ -1045,7 +1056,7 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
 
       <style jsx>{`
         .project-row-wrapper {
-          border-top: 1px solid rgba(255, 255, 255, 0.07);
+          border-top: 1px solid rgba(255, 255, 255, 0.04);
           transition: background 0.18s ease;
         }
 
@@ -1150,8 +1161,7 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
           font-weight: 700;
           color: #ffffff;
           margin-bottom: 18px;
-          letter-spacing: 0.03em;
-          text-transform: uppercase;
+          letter-spacing: 0;
           display: flex;
           align-items: center;
         }
