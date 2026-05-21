@@ -34,9 +34,15 @@ function projectName(job: Job) {
   if (!job.source) return `Project ${job.id}`;
   try {
     const url = new URL(job.source);
-    return url.hostname.replace(/^www\./, "") + url.pathname;
+    const host = url.hostname.replace(/^www\./, "");
+    if (host.includes("youtube.com") || host.includes("youtu.be")) {
+      const videoId = url.searchParams.get("v") || url.pathname.split("/").filter(Boolean).pop() || "";
+      return videoId ? `YouTube / ${videoId}` : "YouTube video";
+    }
+    const path = url.pathname.replace(/\/$/, "").split("/").pop() || "";
+    return path ? `${host} / ${decodeURIComponent(path)}` : host;
   } catch {
-    return job.source;
+    return job.source.length > 50 ? job.source.slice(0, 47) + "..." : job.source;
   }
 }
 
@@ -376,8 +382,8 @@ export default function Dashboard() {
 
         .project-row {
           display: grid;
-          grid-template-columns: minmax(220px, 1fr) 240px auto;
-          gap: 24px;
+          grid-template-columns: minmax(280px, 1fr) 100px 90px auto;
+          gap: 20px;
           align-items: center;
           min-height: 88px;
           padding: 20px 28px;
@@ -444,10 +450,15 @@ export default function Dashboard() {
           width: fit-content;
         }
 
-        .meta-cell {
+        .status-cell {
           display: flex;
+          justify-content: center;
+        }
+
+        .clips-cell {
+          display: flex;
+          justify-content: center;
           align-items: center;
-          gap: 14px;
         }
 
         .status-pill {
@@ -617,16 +628,25 @@ export default function Dashboard() {
 
         @media (max-width: 860px) {
           .project-row {
-            grid-template-columns: 1fr;
+            grid-template-columns: 1fr 1fr;
             gap: 14px;
             padding: 20px;
           }
 
-          .meta-cell {
-            flex-wrap: wrap;
+          .source-cell {
+            grid-column: 1 / -1;
+          }
+
+          .status-cell {
+            justify-content: flex-start;
+          }
+
+          .clips-cell {
+            justify-content: flex-start;
           }
 
           .row-actions {
+            grid-column: 1 / -1;
             justify-content: stretch;
           }
 
@@ -704,8 +724,9 @@ export default function Dashboard() {
             -webkit-box-orient: vertical;
           }
 
-          .meta-cell {
-            gap: 8px;
+          .status-cell,
+          .clips-cell {
+            justify-content: flex-start;
           }
         }
 
@@ -936,12 +957,17 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
             )}
           </div>
         </div>
-        <div className="meta-cell">
+        <div className="status-cell">
           <span className={`status-pill ${localJob.status}`}>{statusLabel(localJob.status)}</span>
-          <span className="clip-badge">{localJob.clips?.length || 0} clip{(localJob.clips?.length || 0) !== 1 ? "s" : ""}</span>
-          <div className="progress-bar">
-            <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
-          </div>
+        </div>
+        <div className="clips-cell">
+          {activeStatuses.includes(localJob.status) ? (
+            <div className="progress-bar">
+              <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+            </div>
+          ) : (
+            <span className="clip-badge">{localJob.clips?.length || 0} clip{(localJob.clips?.length || 0) !== 1 ? "s" : ""}</span>
+          )}
         </div>
         <div className="row-actions">
           {localJob.status === "complete" && <Link href={`/dashboard/clips?job=${localJob.id}`}>View clips</Link>}
