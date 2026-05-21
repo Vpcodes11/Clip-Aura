@@ -69,7 +69,7 @@ export default function UploadModal({ isOpen, onClose }: UploadModalProps) {
                 <Sparkles size={18} className="text-accent" />
                 <h2>New Video Project</h2>
               </div>
-              <button onClick={onClose} className="close-btn"><X size={20} /></button>
+              <button onClick={onClose} className="close-btn" aria-label="Close modal"><X size={20} /></button>
             </div>
 
             <div className="modal-tabs">

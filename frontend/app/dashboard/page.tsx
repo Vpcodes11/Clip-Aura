@@ -88,7 +88,7 @@ export default function Dashboard() {
         <div className="library-header">
           <div className="search-bar glass">
             <Search size={16} className="text-muted" />
-            <input type="text" placeholder="Search your clips..." />
+            <input type="text" placeholder="Search your clips..." aria-label="Search clips" />
           </div>
           <div className="filter-group">
             <button className="filter-btn glass"><Filter size={16} /> Filter</button>
@@ -131,9 +131,9 @@ export default function Dashboard() {
                   </div>
                   <h3>{clip.title}</h3>
                   <div className="clip-actions">
-                    <button onClick={() => window.open(`${apiUrl}/api/download/${job.id}/${clip.filename}`)} title="Download"><Download size={16} /></button>
-                    <button title="Share"><Share2 size={16} /></button>
-                    <button title="Open Editor"><ExternalLink size={16} /></button>
+                    <button onClick={() => window.open(`${apiUrl}/api/download/${job.id}/${clip.filename}`)} title="Download" aria-label="Download clip"><Download size={16} /></button>
+                    <button title="Share" aria-label="Share clip"><Share2 size={16} /></button>
+                    <button title="Open Editor" aria-label="Open clip editor"><ExternalLink size={16} /></button>
                   </div>
                 </div>
               </motion.div>
