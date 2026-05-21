@@ -70,31 +70,31 @@ def get_preview_signing_secret() -> bytes:
     return secret.encode("utf-8")
 
 
-def sign_preview_url(job_id: str, filename: str, expires_at: Optional[int] = None) -> str:
+def sign_preview_url(job_id: str, filename: str, user_id: str, expires_at: Optional[int] = None) -> str:
     safe_name = os.path.basename(filename)
     if safe_name != filename or not safe_name:
         raise HTTPException(status_code=400, detail="Invalid filename")
     exp = expires_at or int(time.time()) + PREVIEW_URL_TTL_SECONDS
-    payload = f"{job_id}:{safe_name}:{exp}".encode("utf-8")
+    payload = f"{job_id}:{safe_name}:{user_id}:{exp}".encode("utf-8")
     sig = hmac.new(get_preview_signing_secret(), payload, hashlib.sha256).hexdigest()
     return f"/api/preview/{job_id}/{urllib.parse.quote(safe_name)}?exp={exp}&sig={sig}"
 
 
-def verify_preview_signature(job_id: str, filename: str, exp: Optional[int], sig: Optional[str]) -> None:
+def verify_preview_signature(job_id: str, filename: str, user_id: str, exp: Optional[int], sig: Optional[str]) -> None:
     if not exp or not sig:
         raise HTTPException(status_code=403, detail="Missing preview signature.")
     if exp < int(time.time()):
         raise HTTPException(status_code=403, detail="Preview link expired.")
-    expected = sign_preview_url(job_id, filename, exp).split("sig=", 1)[1]
+    expected = sign_preview_url(job_id, filename, user_id, exp).split("sig=", 1)[1]
     if not hmac.compare_digest(expected, sig):
         raise HTTPException(status_code=403, detail="Invalid preview signature.")
 
 
-def add_preview_urls(job_id: str, clips):
+def add_preview_urls(job_id: str, user_id: str, clips):
     enriched = []
     for clip in clips or []:
         if isinstance(clip, dict) and clip.get("filename"):
-            enriched.append({**clip, "preview_url": sign_preview_url(job_id, clip["filename"])})
+            enriched.append({**clip, "preview_url": sign_preview_url(job_id, clip["filename"], user_id)})
         else:
             enriched.append(clip)
     return enriched
@@ -112,7 +112,7 @@ def serialize_job(job: Job) -> dict:
         "provider": job.provider,
         "preset": job.preset,
         "caption_style": job.caption_style,
-        "clips": add_preview_urls(job.id, job.clips),
+        "clips": add_preview_urls(job.id, job.user_id, job.clips),
         "errors": job.errors or [],
         "transcript": job.transcript,
         "created_at": job.created_at,
@@ -541,7 +541,7 @@ async def get_status(job_id: str, db: Session = Depends(get_db), user: User = De
         'stage': job.stage,
         'progress': job.progress,
         'message': job.message,
-        'clips': add_preview_urls(job.id, job.clips),
+        'clips': add_preview_urls(job.id, user.id, job.clips),
         'transcript': job.transcript,
         'errors': job.errors or [],
     })
@@ -562,7 +562,7 @@ async def get_preview_url(job_id: str, filename: str, db: Session = Depends(get_
     if safe_name not in clip_names:
         raise HTTPException(status_code=404, detail="Clip not found")
 
-    return {"preview_url": sign_preview_url(job_id, safe_name)}
+    return {"preview_url": sign_preview_url(job_id, safe_name, user.id)}
 
 
 
@@ -602,13 +602,17 @@ async def download_clip(job_id: str, filename: str, db: Session = Depends(get_db
 
 
 @app.get("/api/preview/{job_id}/{filename}")
-async def preview_clip(job_id: str, filename: str, exp: Optional[int] = None, sig: Optional[str] = None):
-    """Stream clip for in-browser preview (No auth required for simple preview)"""
+async def preview_clip(job_id: str, filename: str, exp: Optional[int] = None, sig: Optional[str] = None, db: Session = Depends(get_db)):
+    """Stream clip for in-browser preview (ownership enforced via signed URL)"""
     safe_name = os.path.basename(filename)
     if safe_name != filename or not safe_name:
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    verify_preview_signature(job_id, safe_name, exp, sig)
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    verify_preview_signature(job_id, safe_name, job.user_id, exp, sig)
 
     redirect = _cloud_redirect(job_id, safe_name)
     if redirect:
@@ -822,7 +826,7 @@ async def regenerate_clip_in_background(
         await redis_async.publish(f"job_progress_{job_id}", json.dumps({
             'type': 'complete',
             'message': job.message,
-            'clips': add_preview_urls(job_id, job.clips),
+            'clips': add_preview_urls(job_id, job.user_id, job.clips),
             'transcript': job.transcript
         }))
         

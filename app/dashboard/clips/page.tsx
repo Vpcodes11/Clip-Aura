@@ -125,6 +125,13 @@ export default function ClipsPage() {
   }, [clips, query, sortBy, filterJobId]);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const getPreviewUrl = React.useCallback(
+    (clip: ClipWithJob) => {
+      if (!clip.preview_url) return "";
+      return clip.preview_url.startsWith("http") ? clip.preview_url : `${apiUrl}${clip.preview_url}`;
+    },
+    [apiUrl],
+  );
 
   const showEmptyState = !isLoading && clips.length === 0;
   const showNoSearchResults = !isLoading && clips.length > 0 && filteredClips.length === 0;
@@ -224,7 +231,8 @@ export default function ClipsPage() {
             >
               <div className="preview">
                 <video
-                  src={`${apiUrl}/api/preview/${clip.jobId}/${clip.filename}`}
+                  key={`${clip.jobId}-${clip.filename}-${clip.render_version || 0}`}
+                  src={getPreviewUrl(clip)}
                   muted
                   playsInline
                   onMouseOver={(event) => event.currentTarget.play()}

@@ -11,6 +11,7 @@ export interface Clip {
   virality_score: number;
   duration?: string | number;
   hook_caption?: string;
+  preview_url?: string;
   reason?: string;
   category?: string;
   hashtags?: string[] | string;
@@ -35,7 +36,9 @@ export default function ExportModal({ isOpen, onClose, jobId, clip, clipIndex }:
 
   if (!clip) return null;
 
-  const previewUrl = `${apiUrl}/api/preview/${jobId}/${clip.filename}`;
+  const previewUrl = clip.preview_url
+    ? (clip.preview_url.startsWith("http") ? clip.preview_url : `${apiUrl}${clip.preview_url}`)
+    : "";
   const downloadUrl = `${apiUrl}/api/download/${jobId}/${clip.filename}`;
   
   // Format hashtags properly
