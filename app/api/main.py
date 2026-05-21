@@ -136,7 +136,8 @@ async def upload_video(
         db.commit()
 
         if STORAGE_MODE == "cloud":
-            storage.upload_file(str(video_path), f"jobs/{job_id}/source/{file.filename}")
+            # ⚡ Bolt Optimization: Offload blocking S3 upload to thread pool
+            await asyncio.to_thread(storage.upload_file, str(video_path), f"jobs/{job_id}/source/{file.filename}")
 
         celery_app.send_task("tasks.process_video_job", args=[job_id])
     else:
@@ -218,7 +219,7 @@ async def get_status(job_id: str, db: Session = Depends(get_db), user: User = De
 async def download_clip(job_id: str, filename: str, user: User = Depends(get_current_user)):
     """Download a generated clip"""
     if STORAGE_MODE == "cloud":
-        url = storage.generate_signed_url(f"jobs/{job_id}/{filename}")
+        url = await asyncio.to_thread(storage.generate_signed_url, f"jobs/{job_id}/{filename}")
         if url:
             return RedirectResponse(url)
     
@@ -232,7 +233,7 @@ async def download_clip(job_id: str, filename: str, user: User = Depends(get_cur
 async def preview_clip(job_id: str, filename: str):
     """Stream clip for in-browser preview (No auth required for simple preview)"""
     if STORAGE_MODE == "cloud":
-        url = storage.generate_signed_url(f"jobs/{job_id}/{filename}")
+        url = await asyncio.to_thread(storage.generate_signed_url, f"jobs/{job_id}/{filename}")
         if url:
             return RedirectResponse(url)
 
@@ -256,9 +257,12 @@ async def delete_job(job_id: str, db: Session = Depends(get_db), user: User = De
     if job:
         if STORAGE_MODE == "cloud":
             if job.clips:
+                # ⚡ Bolt Optimization: Concurrently delete all S3 files using gather + threads
+                tasks = []
                 for clip in job.clips:
-                    storage.delete_file(f"jobs/{job_id}/{clip['filename']}")
-                    storage.delete_file(f"jobs/{job_id}/{clip['thumbnail']}")
+                    tasks.append(asyncio.to_thread(storage.delete_file, f"jobs/{job_id}/{clip['filename']}"))
+                    tasks.append(asyncio.to_thread(storage.delete_file, f"jobs/{job_id}/{clip['thumbnail']}"))
+                await asyncio.gather(*tasks)
 
         db.delete(job)
         db.commit()
