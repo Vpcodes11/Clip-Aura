@@ -78,17 +78,17 @@ export default function Home() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ ...springTransition, delay: 0.1 }}
-              className="text-6xl md:text-8xl tracking-tighter leading-[0.9] text-white mb-8"
+              className="text-5xl md:text-7xl tracking-tighter leading-[0.95] text-white mb-8"
             >
               Cinematic Shorts.{" "}
-              <span className="text-zinc-600 inline-block">Built for Creators.</span>
+              <span className="text-zinc-500 inline-block">Built for Creators.</span>
             </motion.h1>
 
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ ...springTransition, delay: 0.2 }}
-              className="text-lg text-zinc-400 max-w-md leading-relaxed mb-10"
+              className="text-lg text-zinc-300 max-w-md leading-relaxed mb-10"
             >
               The first AI pipeline designed for high-stakes video production. Process raw footage into TikToks and Reels with precise subtitles, intelligent reframing, and complete privacy.
             </motion.p>
@@ -158,7 +158,7 @@ export default function Home() {
         <div className="page-container">
           <div className="mb-16 md:mb-20 reveal">
             <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-white mb-5">Precision Engineering</h2>
-            <p className="text-zinc-400 max-w-xl text-lg leading-relaxed">We stripped away the generic AI toys to build a production tool that respects your workflow.</p>
+            <p className="text-zinc-300 max-w-xl text-lg leading-relaxed">We stripped away the generic AI toys to build a production tool that respects your workflow.</p>
           </div>
 
           <div className="reveal-stagger grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
@@ -173,7 +173,7 @@ export default function Home() {
               </div>
               <div>
                 <h3 className="text-2xl font-bold text-white mb-2">Intelligent Reframing</h3>
-                <p className="text-zinc-400 max-w-md">Our deterministic face tracking keeps the subject locked dead center. It doesn&apos;t guess; it calculates the exact crop coordinates for 9:16 perfection.</p>
+                <p className="text-zinc-300 max-w-md">Our deterministic face tracking keeps the subject locked dead center. It doesn&apos;t guess; it calculates the exact crop coordinates for 9:16 perfection.</p>
               </div>
               {/* Decorative grid overlay */}
               <div className="absolute top-8 right-8 w-48 h-48 border border-white/5 rounded-2xl bg-zinc-950/50 overflow-hidden hidden sm:flex items-center justify-center">
