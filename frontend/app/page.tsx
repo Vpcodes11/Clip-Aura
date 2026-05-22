@@ -52,7 +52,7 @@ export default function Home() {
   const pipelineScale = useTransform(scrollYProgress, [0, 0.3, 0.7, 1], [0.98, 1, 1, 0.98]);
 
   return (
-    <main ref={revealRef} className="pt-20 min-h-[100dvh] flex flex-col bg-black">
+    <main ref={revealRef} className="pt-20 min-h-[100dvh] flex flex-col bg-[#050505]">
       {/* ================================================================
           HERO — asymmetric left-aligned, cinematic entrance
           ================================================================ */}
@@ -154,7 +154,7 @@ export default function Home() {
       {/* ================================================================
           FEATURES — Bento grid, staggered reveals, hover depth
           ================================================================ */}
-      <section id="features" className="relative py-24 md:py-32 border-t border-white/5">
+      <section id="features" className="relative py-24 md:py-32 border-t border-white/[0.08]">
         <div className="page-container">
           <div className="mb-16 md:mb-20 reveal">
             <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-white mb-5">Precision Engineering</h2>
@@ -239,7 +239,7 @@ export default function Home() {
       {/* ================================================================
           DEMO / PIPELINE — computational atmosphere, animated processor
           ================================================================ */}
-      <section id="demo" ref={pipelineRef} className="relative py-24 md:py-32 bg-zinc-950/80 border-y border-white/5 overflow-hidden" style={{ position: "relative" }}>
+      <section id="demo" ref={pipelineRef} className="relative py-24 md:py-32 bg-[#07090c] border-y border-white/[0.08] overflow-hidden" style={{ position: "relative" }}>
         <motion.div style={{ opacity: pipelineOpacity, scale: pipelineScale }} className="page-container flex flex-col lg:flex-row gap-14 lg:gap-24 items-center">
           <div className="flex-1 w-full relative">
             <div className="aspect-video bg-black rounded-2xl border border-zinc-800 overflow-hidden relative shadow-2xl">
