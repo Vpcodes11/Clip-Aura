@@ -1,85 +1,36 @@
-# 🎬 Clip Aura — AI Viral Clip Engine
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-![Clip Aura Banner](https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1000&auto=format&fit=crop)
+## Getting Started
 
-**Clip Aura** is a high-performance, open-source AI video clipping engine that transforms long-form content (podcasts, streams, interviews) into viral short-form clips for TikTok, Reels, and YouTube Shorts. 
+First, run the development server:
 
-Built with **FastAPI**, **Celery**, **Whisper**, and **LLaMA 3**, it handles the entire pipeline: from URL downloading and AI transcription to face-tracking crops and animated "Typography Motion" captions.
-
----
-
-## ✨ Key Features
-
-- **🎯 AI Viral Moment Detection**: LLaMA 3.1 analyzes transcripts to find the most "hook-worthy" and shareable segments automatically.
-- **📐 Dynamic Face-Tracking**: AI detects faces and automatically crops landscape video into 9:16 vertical format while keeping the speaker centered.
-- **✨ Animated Typography Captions**: Word-by-word "Karaoke style" captions with cursive emphasis and power-word highlighting.
-- **🔗 Universal Import**: Supports YouTube, Twitch, Vimeo, X (Twitter), and 1000+ sites via `yt-dlp`.
-- **🏗️ Industrial SaaS Stack**: Distributed background processing with Docker, Redis, and Celery for maximum scalability.
-- **💳 Commercial Ready**: Integrated Supabase Auth, Usage Credit system, and Stripe Webhook support.
-
----
-
-## 🛠️ Technology Stack
-
-| Component | Technology |
-| :--- | :--- |
-| **Backend** | Python, FastAPI |
-| **Task Queue** | Celery, Redis |
-| **AI Transcription** | OpenAI Whisper (via Groq) |
-| **Viral Analysis** | LLaMA 3.1 70B / 8B |
-| **Video Processing** | FFmpeg, OpenCV, MediaPipe |
-| **Auth & DB** | Supabase, SQLAlchemy, SQLite |
-| **Deployment** | Docker, Docker Compose |
-
----
-
-## 🚀 Quick Start (Local Setup)
-
-### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-username/Clip-Aura.git
-cd Clip-Aura
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-### 2. Configure Environment
-Create a `.env` file from the template and add your API keys:
-```bash
-cp .env.example .env
-```
-*Required: `GROQ_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`.*
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-### 3. Launch with Docker
-```bash
-docker-compose up --build
-```
-The app will be live at **[http://localhost:8000](http://localhost:8000)**.
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
----
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## 📁 Project Structure
+## Learn More
 
-```text
-Clip-Aura/
-├── app/
-│   ├── api/          # FastAPI Routes, Auth, Database Models
-│   ├── core/         # AI Logic (Clipping, Tracking, Transcription)
-│   ├── worker/        # Celery Task Definitions
-│   └── config.py     # Global Settings & Caption Styles
-├── static/           # Premium Frontend (JS/CSS/HTML)
-├── tests/            # Automated Pipeline Tests
-├── Dockerfile        # Container Configuration
-└── docker-compose.yml # Service Orchestration
-```
+To learn more about Next.js, take a look at the following resources:
 
----
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-## 📜 License
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
----
+## Deploy on Vercel
 
-## 🙌 Credits
-- **AI Engine**: Powered by Groq (Whisper + LLaMA)
-- **Face Tracking**: MediaPipe by Google
-- **Typography**: Montserrat & Inter via Google Fonts
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

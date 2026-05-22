@@ -4,7 +4,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import create_client, Client
 from sqlalchemy.orm import Session
 from app.api.database import get_db
-from app.api.models import User
+from app.config import DEV_MODE
+from app.models.models import User
 
 # Configuration from .env
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -28,8 +29,6 @@ async def get_current_user(
     Verifies the token using the official Supabase client.
     Supports a DEV_MODE bypass for rapid testing.
     """
-    DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
-    
     if DEV_MODE:
         # Bypass Supabase and return a mock 'Dev Architect' user
         user_id = "dev-architect-id"

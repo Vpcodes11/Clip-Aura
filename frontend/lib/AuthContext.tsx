@@ -36,7 +36,7 @@ function buildDevSession(): { user: User; session: Session } {
   return { user: devUser, session: devSession };
 }
 
-const devInit = isDevMode ? buildDevSession() : null;
+const devSessionData = isDevMode ? buildDevSession() : null;
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
@@ -46,13 +46,21 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(() => devInit?.user ?? null);
-  const [session, setSession] = useState<Session | null>(() => devInit?.session ?? null);
-  const [loading, setLoading] = useState(!devInit);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    if (devInit) return;
+    const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+    
+    if (isDevMode) {
+      const devSession = buildDevSession();
+      setUser(devSession.user);
+      setSession(devSession.session);
+      setLoading(false);
+      return;
+    }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);

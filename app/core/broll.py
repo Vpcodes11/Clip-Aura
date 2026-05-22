@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import requests
+from app.config import FFMPEG_TIMEOUT_SECONDS
 
 # High-visual-impact keywords mapped to better Pexels search terms
 BROLL_KEYWORD_MAP = {
@@ -186,7 +187,7 @@ def overlay_broll_on_clip(main_clip_path: str, broll_entries: list,
             '-y', output_path
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT_SECONDS)
         if result.returncode != 0:
             print(f"[BRoll] FFmpeg overlay failed: {result.stderr[-400:]}")
             return False

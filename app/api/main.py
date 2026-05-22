@@ -15,7 +15,7 @@ import redis.asyncio as redis
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Depends, HTTPException, BackgroundTasks, Header
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,11 +23,11 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.config import UPLOAD_DIR, OUTPUT_DIR, BASE_DIR, PRESETS, CAPTION_STYLES, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, STORAGE_MODE, DEV_MODE, S3_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+from app.config import UPLOAD_DIR, OUTPUT_DIR, BASE_DIR, PRESETS, CAPTION_STYLES, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, STORAGE_MODE, DEV_MODE, S3_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MAX_UPLOAD_SIZE
 from app.api.database import engine, Base, get_db, SessionLocal
-from app.api.models import Job, User
+from app.models.models import Job, User
 from app.api.schema_compat import ensure_job_columns
-from app.worker.celery_app import celery_app
+from app.workers.celery_app import celery_app
 from app.core.storage import storage
 from app.api.auth import get_current_user, get_supabase_client
 from app.api import payments
@@ -50,6 +50,13 @@ app = FastAPI(title="Clip Aura — AI Video Clipper")
 # Security Constraints
 ALLOWED_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm'}
 PREVIEW_URL_TTL_SECONDS = 15 * 60
+
+
+def enforce_upload_size_limit(content_length: Optional[int], bytes_received: int = 0) -> None:
+    if content_length is not None and content_length > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="Upload exceeds maximum allowed size.")
+    if bytes_received > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="Upload exceeds maximum allowed size.")
 
 
 def resolve_job_file(directory: Path, filename: str) -> Path:
@@ -343,6 +350,7 @@ async def upload_video(
     provider: str = Form(None),
     preset: str = Form('landscape'),
     caption_style: str = Form(DEFAULT_CAPTION_STYLE),
+    content_length: Optional[int] = Header(None),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
@@ -409,6 +417,7 @@ async def upload_video(
         
     elif file:
         # File upload mode
+        enforce_upload_size_limit(content_length)
         ext = Path(file.filename).suffix.lower()
         if ext not in ALLOWED_EXTENSIONS:
             raise HTTPException(
@@ -418,10 +427,18 @@ async def upload_video(
             
         safe_name = sanitize_filename(file.filename)
         video_path = job_dir / safe_name
+        bytes_written = 0
         
-        with open(video_path, 'wb') as f:
-            while chunk := await file.read(1024 * 1024):
-                f.write(chunk)
+        try:
+            with open(video_path, 'wb') as f:
+                while chunk := await file.read(1024 * 1024):
+                    bytes_written += len(chunk)
+                    enforce_upload_size_limit(content_length, bytes_written)
+                    f.write(chunk)
+        except HTTPException:
+            if video_path.exists():
+                video_path.unlink()
+            raise
 
         new_job = Job(
             id=job_id,
@@ -779,7 +796,7 @@ async def regenerate_clip_in_background(
         
         # Run create_clip in a thread-pool executor to avoid blocking the event loop
         loop = asyncio.get_running_loop()
-        from app.core.clipper import create_clip
+        from app.rendering.clipper import create_clip
         await loop.run_in_executor(
             None,
             lambda: create_clip(

@@ -33,7 +33,7 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -43,15 +43,15 @@ export default function LoginPage() {
         if (error) throw error;
         setSuccessMsg("Verification link sent! Check your inbox.");
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
         router.push("/dashboard");
       }
-    } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "An authentication error occurred.");
+    } catch (err: any) {
+      setErrorMsg(err.message || "An authentication error occurred.");
     } finally {
       setLoading(false);
     }
@@ -68,8 +68,8 @@ export default function LoginPage() {
         },
       });
       if (error) throw error;
-    } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "Google login failed.");
+    } catch (err: any) {
+      setErrorMsg(err.message || "Google login failed.");
       setLoading(false);
     }
   };
@@ -101,11 +101,11 @@ export default function LoginPage() {
             O
           </div>
           <h1 className="text-2xl font-bold font-outfit tracking-wide text-white">
-            {isSignUp ? "Create Workspace" : "Welcome Back"}
+            {isSignUp ? "Request Beta Access" : "Welcome Back"}
           </h1>
           <p className="text-sm text-muted">
             {isSignUp
-              ? "Access the first cinematic AI clipping pipeline."
+              ? "Join the waitlist for the first cinematic AI clipping pipeline."
               : "Access your stealth video workspace."}
           </p>
         </div>
@@ -165,7 +165,7 @@ export default function LoginPage() {
             {loading ? (
               <Loader2 className="spin" size={16} />
             ) : isSignUp ? (
-              "Initialize Account"
+              "Request Access"
             ) : (
               "Sign In"
             )}
@@ -200,7 +200,7 @@ export default function LoginPage() {
         <div className="text-center text-xs text-muted">
           {isSignUp ? (
             <span>
-              Already have an workspace?{" "}
+              Already have an invite?{" "}
               <button
                 onClick={() => setIsSignUp(false)}
                 className="text-accent hover:underline font-semibold"
@@ -210,12 +210,12 @@ export default function LoginPage() {
             </span>
           ) : (
             <span>
-              Don&apos;t have an workspace?{" "}
+              Don&apos;t have an invite?{" "}
               <button
                 onClick={() => setIsSignUp(true)}
                 className="text-accent hover:underline font-semibold"
               >
-                Create Account
+                Request Access
               </button>
             </span>
           )}

@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Loader2, X, Upload, Link as LinkIcon, Sparkles, Smartphone, Monitor, Square as SquareIcon, Check } from 'lucide-react';
-import { authenticatedFetch } from '@/lib/supabase';
+import { authenticatedFetch, supabase } from '@/lib/supabase';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -73,6 +73,16 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
     loadPresets();
   }, [isOpen]);
 
+  // Escape key closes modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // Reset modal state on open/close
   useEffect(() => {
     if (!isOpen) return;
@@ -109,21 +119,21 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
       formData.append('caption_style', selectedStyle);
  
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+      let accessToken = 'dev-token';
+
+      if (!isDevMode) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error('Authentication required. Please sign in again.');
+        }
+        accessToken = session.access_token;
+      }
 
       const data = await new Promise<UploadResponse>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `${apiUrl}/api/upload`);
-
-        const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE !== 'false';
-        let token: string | null = null;
-        if (isDevMode) {
-          token = 'dev-token';
-        } else {
-          token = localStorage.getItem('sb-access-token');
-        }
-        if (token) {
-          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        }
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
 
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) {
@@ -510,7 +520,7 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
               }
               .drop-zone:hover {
                 border-color: var(--accent);
-                background: rgba(246, 92, 139, 0.04);
+                background: rgba(124, 58, 237, 0.04);
               }
               .drop-zone.active {
                 border-color: var(--accent-2);
@@ -564,7 +574,7 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
               .stealth-input:focus { 
                 border-color: var(--accent);
                 background: rgba(255,255,255,0.05);
-                box-shadow: 0 0 0 3px rgba(246, 92, 139, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+                box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.2);
               }
 
               .section-title {
@@ -599,17 +609,17 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
                 background: rgba(255, 255, 255, 0.04);
                 border-color: var(--accent);
                 transform: translateY(-2px);
-                box-shadow: 0 0 12px rgba(246, 92, 139, 0.15);
+                box-shadow: 0 0 12px rgba(124, 58, 237, 0.15);
               }
               .preset-card.active {
-                background: rgba(246, 92, 139, 0.04);
+                background: rgba(124, 58, 237, 0.04);
                 border-color: var(--accent);
-                box-shadow: 0 0 20px rgba(246, 92, 139, 0.15), inset 0 1px 0 rgba(255,255,255,0.08);
+                box-shadow: 0 0 20px rgba(124, 58, 237, 0.15), inset 0 1px 0 rgba(255,255,255,0.08);
               }
               .preset-card-glow {
                 position: absolute;
                 top: 0; left: 0; width: 100%; height: 100%;
-                background: linear-gradient(135deg, rgba(246, 92, 139, 0.15), transparent);
+                background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), transparent);
                 opacity: 0;
                 transition: opacity 0.3s ease;
               }
@@ -686,7 +696,7 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
               }
               .stealth-select-styled:focus {
                 border-color: var(--accent);
-                box-shadow: 0 0 0 3px rgba(246, 92, 139, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+                box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.2);
               }
               .stealth-select-styled option {
                 background: #0d0d12;

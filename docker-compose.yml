@@ -1,8 +1,7 @@
 services:
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     restart: unless-stopped
 
   web:
@@ -10,15 +9,15 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - .:/app
       - ./uploads:/app/uploads
       - ./output:/app/output
       - ./temp:/app/temp
-      - ./clip_aura.db:/app/clip_aura.db
+      - ./data/db:/app/runtime/db
     env_file:
       - .env
     environment:
-      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
     depends_on:
       - redis
     healthcheck:
@@ -31,17 +30,17 @@ services:
 
   worker:
     build: .
-    command: celery -A app.worker.celery_app worker --loglevel=info
+    command: celery -A app.workers.celery_app worker --loglevel=info
     volumes:
-      - .:/app
       - ./uploads:/app/uploads
       - ./output:/app/output
       - ./temp:/app/temp
-      - ./clip_aura.db:/app/clip_aura.db
+      - ./data/db:/app/runtime/db
     env_file:
       - .env
     environment:
-      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
     depends_on:
       web:
         condition: service_healthy

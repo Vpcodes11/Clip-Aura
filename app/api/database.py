@@ -4,17 +4,36 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 import os
 from app.config import BASE_DIR
 
-# Priority: Environment variable (Postgres) > Local SQLite
-DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not DATABASE_URL:
-    # Build a local SQLite URL as fallback
-    DATABASE_URL = f"sqlite:///{BASE_DIR}/clip_aura.db"
+def build_database_url(database_url: str | None, environment: str, db_dir):
+    if database_url:
+        return database_url
 
-# SQLite requires different arguments than PostgreSQL
-connect_args = {"check_same_thread": False, "timeout": 30} if DATABASE_URL.startswith("sqlite") else {}
+    if environment.lower() in {"production", "prod"}:
+        raise RuntimeError("DATABASE_URL must be set in production; SQLite fallback is not allowed.")
 
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+    db_dir.mkdir(parents=True, exist_ok=True)
+    return f"sqlite:///{db_dir}/clip_aura.db"
+
+
+def build_engine_options(database_url: str):
+    if database_url.startswith("sqlite"):
+        return {"connect_args": {"check_same_thread": False, "timeout": 30}}
+
+    if database_url.startswith("postgresql"):
+        return {"pool_size": 10, "max_overflow": 20, "pool_recycle": 3600}
+
+    return {}
+
+
+# Priority: Environment variable (Postgres) > Local SQLite outside production
+DATABASE_URL = build_database_url(
+    os.getenv("DATABASE_URL"),
+    os.getenv("ENVIRONMENT", "development"),
+    BASE_DIR / "runtime" / "db",
+)
+
+engine = create_engine(DATABASE_URL, **build_engine_options(DATABASE_URL))
 
 from sqlalchemy.event import listens_for
 @listens_for(engine, "connect")

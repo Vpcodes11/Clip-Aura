@@ -6,13 +6,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BASE_DIR = Path(__file__).parent.parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-OUTPUT_DIR = BASE_DIR / "output"
-TEMP_DIR = BASE_DIR / "temp"
+RUNTIME_DIR = BASE_DIR / "runtime"
+UPLOAD_DIR = RUNTIME_DIR / "uploads"
+OUTPUT_DIR = RUNTIME_DIR / "renders"
+TEMP_DIR = RUNTIME_DIR / "temp"
+LOGS_DIR = RUNTIME_DIR / "logs"
+DB_DIR = RUNTIME_DIR / "db"
+PREVIEWS_DIR = RUNTIME_DIR / "previews"
 
 # Create dirs
-for d in [UPLOAD_DIR, OUTPUT_DIR, TEMP_DIR]:
-    d.mkdir(exist_ok=True)
+for d in [UPLOAD_DIR, OUTPUT_DIR, TEMP_DIR, LOGS_DIR, DB_DIR, PREVIEWS_DIR]:
+    d.mkdir(parents=True, exist_ok=True)
 
 # Video output presets
 PRESETS = {
@@ -32,6 +36,9 @@ MAX_CLIPS = 8
 # Whisper API file size limit (25MB)
 WHISPER_MAX_FILE_SIZE = 24 * 1024 * 1024  # 24MB to be safe
 AUDIO_CHUNK_DURATION = 600  # 10 minutes per chunk
+
+# Upload safety limit (default 2GB)
+MAX_UPLOAD_SIZE = int(os.getenv("MAX_UPLOAD_SIZE", str(2 * 1024 * 1024 * 1024)))
 
 # Caption styles
 CAPTION_STYLES = {
@@ -239,6 +246,13 @@ DEFAULT_CAPTION_STYLE = "typography_motion"
 
 # Dev mode bypass — single source of truth for all modules
 DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development").lower()
+if DEV_MODE and ENVIRONMENT in {"production", "prod"}:
+    raise RuntimeError("DEV_MODE must be false when ENVIRONMENT=production.")
+
+FFMPEG_TIMEOUT_SECONDS = int(os.getenv("FFMPEG_TIMEOUT_SECONDS", "300"))
+FFPROBE_TIMEOUT_SECONDS = int(os.getenv("FFPROBE_TIMEOUT_SECONDS", "30"))
+THUMBNAIL_TIMEOUT_SECONDS = int(os.getenv("THUMBNAIL_TIMEOUT_SECONDS", "30"))
 
 # API Keys (stored in .env file, never committed to git)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -258,7 +272,11 @@ S3_REGION = os.getenv("S3_REGION", "us-east-1")
 STORAGE_MODE = os.getenv("STORAGE_MODE", "local") # "local" or "cloud"
 
 # Infrastructure
-REDIS_URL = os.getenv('REDIS_URL', 'redis://redis:6379/0')
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
+REDIS_URL = os.getenv(
+    "REDIS_URL",
+    f"redis://:{REDIS_PASSWORD}@redis:6379/0" if REDIS_PASSWORD else "redis://redis:6379/0",
+)
 
 # Payments (Stripe)
 STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')

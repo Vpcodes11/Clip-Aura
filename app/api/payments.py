@@ -4,7 +4,7 @@ import redis.asyncio as redis
 from fastapi import APIRouter, Request, Header, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.api.database import get_db
-from app.api.models import User
+from app.models.models import User
 from app.config import STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRO_PRICE_ID
 from app.api.auth import get_current_user
 
