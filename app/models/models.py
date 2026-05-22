@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey
+from sqlalchemy import Boolean, Column, String, Integer, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import relationship
 from app.api.database import Base
 
@@ -10,6 +10,7 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     stripe_customer_id = Column(String, nullable=True)
     subscription_tier = Column(String, default="free") # "free", "pro", "unlimited"
+    is_beta_user = Column(Boolean, default=False, nullable=False)
     
     # Credit system (minutes)
     total_minutes_limit = Column(Integer, default=15) # 15 free mins/month

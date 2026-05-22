@@ -8,6 +8,10 @@ JOB_COLUMNS = {
     "stage": "VARCHAR",
 }
 
+USER_COLUMNS = {
+    "is_beta_user": "BOOLEAN DEFAULT 0 NOT NULL",
+}
+
 
 def ensure_job_columns(engine):
     """Add newly introduced Job columns when SQLite create_all cannot alter tables."""
@@ -26,3 +30,22 @@ def ensure_job_columns(engine):
     with engine.begin() as conn:
         for name, kind in missing:
             conn.execute(text(f"ALTER TABLE jobs ADD COLUMN {name} {kind}"))
+
+
+def ensure_user_columns(engine):
+    """Add newly introduced User columns when SQLite create_all cannot alter tables."""
+    if not str(engine.url).startswith("sqlite"):
+        return
+
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    existing = {column["name"] for column in inspector.get_columns("users")}
+    missing = [(name, kind) for name, kind in USER_COLUMNS.items() if name not in existing]
+    if not missing:
+        return
+
+    with engine.begin() as conn:
+        for name, kind in missing:
+            conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {kind}"))

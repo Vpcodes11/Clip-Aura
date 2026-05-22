@@ -92,6 +92,9 @@ export default function Dashboard() {
         const data = await res.json();
         setJobs(data);
         hasActiveRef.current = data.some((job: Job) => activeStatuses.includes(job.status));
+      } else if (res.status === 403) {
+        const err = await res.json();
+        setActionError(err.detail || "Access Denied: Your account is on the waitlist and has not yet been granted beta access.");
       }
     } catch (err) {
       console.error("Failed to fetch projects:", err);
@@ -155,6 +158,13 @@ export default function Dashboard() {
           Generate Shorts
         </button>
       </section>
+
+      {actionError && (
+        <div className="global-error">
+          <AlertTriangle size={18} className="inline-icon" />
+          {actionError}
+        </div>
+      )}
 
       {showEmptyState ? (
         <section className="empty-guide">
@@ -245,6 +255,24 @@ export default function Dashboard() {
           color: #fca5a5;
           font-size: 13px;
           font-weight: 700;
+        }
+
+        .global-error {
+          padding: 16px;
+          background: rgba(239, 68, 68, 0.08);
+          border: 1px solid rgba(239, 68, 68, 0.22);
+          border-radius: 12px;
+          color: #fca5a5;
+          font-size: 14px;
+          font-weight: 600;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          animation: fadeSlide 0.32s ease both;
+        }
+
+        .inline-icon {
+          flex-shrink: 0;
         }
 
         .primary-action {

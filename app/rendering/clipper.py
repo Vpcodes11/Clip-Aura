@@ -3,6 +3,7 @@ import subprocess
 import os
 import json
 import functools
+import logging
 from pathlib import Path
 from app.config import (
     BASE_DIR,
@@ -14,6 +15,8 @@ from app.config import (
     THUMBNAIL_TIMEOUT_SECONDS,
 )
 from app.tracking.face_processor import tracker
+
+logger = logging.getLogger(__name__)
 
 
 SAFE_FONT_FALLBACKS = {
@@ -154,6 +157,16 @@ def generate_ass_subtitles(words, clip_start, clip_end, output_path, caption_sty
     Generate ASS subtitle file with word-by-word karaoke animation.
     Now includes the Viral Hook Headline at the top.
     """
+
+    def _deterministic_emoji_roll(seed_text, threshold):
+        digest = hashlib.md5(seed_text.encode()).digest()
+        value = int.from_bytes(digest[:4], "big") / 0xFFFFFFFF
+        return value < threshold
+
+    def _deterministic_emoji_pick(seed_text):
+        digest = hashlib.md5(seed_text.encode()).digest()
+        idx = int.from_bytes(digest[:4], "big") % len(EMOJIS)
+        return EMOJIS[idx];
     if not caption_style:
         caption_style = DEFAULT_CAPTION_STYLE
     if caption_style not in CAPTION_STYLES:
@@ -173,9 +186,10 @@ def generate_ass_subtitles(words, clip_start, clip_end, output_path, caption_sty
     if tw < th:
         video_h = tw * 9 / 16
         space_below = (th - video_h) / 2
-        margin_v = int(space_below - 120)
+        margin_v = max(int(space_below - 120), style.get('margin_v', 80))
     else:
         margin_v = style.get('margin_v', 80)
+    margin_v = max(margin_v, 40)
     
     bold_flag = -1 if style['bold'] else 0
     default_font = resolve_ass_font(style['font'])
@@ -226,7 +240,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             groups.append(current_group)
 
         from app.config import POWER_WORDS
-        import random
+        import hashlib
         EMOJIS = ["🚀", "🔥", "💎", "💰", "😱", "✅", "🛑", "👀", "🤯", "📈", "🎯", "🤫", "🦁", "👑"]
 
         for i, group in enumerate(groups):
@@ -263,16 +277,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 if caption_style == "typography_motion":
                     if clean_word in POWER_WORDS:
                         display_word = raw_word.upper()
-                        if random.random() < 0.25:
-                            display_word += " " + random.choice(EMOJIS)
+                        if _deterministic_emoji_roll(word["word"], 0.25):
+                            display_word += " " + _deterministic_emoji_pick(word["word"])
                         part = f"{{\\fn{default_font}}}{{\\c{style['primary_color']}}}{{\\k{duration_cs}}}{display_word} "
                     else:
                         display_word = raw_word.lower()
                         part = f"{{\\fn{secondary_font}}}{{\\c{style['highlight_color']}}}{{\\k{duration_cs}}}{display_word} "
                 elif caption_style == "hormozi":
                     display_word = raw_word.upper()
-                    if clean_word in POWER_WORDS and random.random() < 0.35:
-                        display_word += " " + random.choice(EMOJIS)
+                    if clean_word in POWER_WORDS and _deterministic_emoji_roll(word["word"], 0.35):
+                        display_word += " " + _deterministic_emoji_pick(word["word"])
                     color_tag = style['highlight_color'] if (j % 2 == 0) else style['primary_color']
                     part = f"{{\\c{color_tag}}}{{\\k{duration_cs}}}{display_word} "
                 elif caption_style == "minimal_modern":
@@ -281,8 +295,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     part = f"{{\\c{color_tag}}}{{\\k{duration_cs}}}{display_word} "
                 else:
                     display_word = raw_word.upper()
-                    if clean_word in POWER_WORDS and random.random() < 0.3:
-                        display_word += " " + random.choice(EMOJIS)
+                    if clean_word in POWER_WORDS and _deterministic_emoji_roll(word["word"], 0.3):
+                        display_word += " " + _deterministic_emoji_pick(word["word"])
                     part = f"{{\\k{duration_cs}}}{display_word} "
 
                 karaoke_parts.append(part)
@@ -416,8 +430,15 @@ def safe_create_clip(video_path, clip_info, words, output_path, clip_index,
             is_pro=is_pro,
         )
         return {"ok": True, "attempt": "dynamic"}
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            "Dynamic render failed for clip %d (start=%.2f, end=%.2f), "
+            "falling back to static: %s",
+            clip_index,
+            clip_info.get("start_time", 0),
+            clip_info.get("end_time", 0),
+            exc,
+        )
 
     # Fallback: retry with a static center crop
     try:

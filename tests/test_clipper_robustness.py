@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 sys.modules.setdefault("mediapipe", MagicMock())
 sys.modules.setdefault("cv2", MagicMock())
 
-from app.core import clipper
+from app.rendering import clipper
 
 
 def test_safe_create_clip_succeeds_with_dynamic(tmp_path, monkeypatch):

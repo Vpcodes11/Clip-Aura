@@ -15,10 +15,17 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 security = HTTPBearer()
+BETA_ACCESS_DENIED_DETAIL = "ClipAura is in private beta. Join the waitlist at clipaura.com."
 
 def get_supabase_client() -> Client:
     """Return the shared Supabase client instance."""
     return supabase
+
+
+def require_beta_access(user: User) -> User:
+    if DEV_MODE or user.is_beta_user:
+        return user
+    raise HTTPException(status_code=403, detail=BETA_ACCESS_DENIED_DETAIL)
 
 
 async def get_current_user(
@@ -69,10 +76,15 @@ async def get_current_user(
             id=user_id,
             email=email,
             subscription_tier="pro" if is_dev else "free",
-            total_minutes_limit=1000 if is_dev else 15
+            total_minutes_limit=1000 if is_dev else 15,
+            is_beta_user=is_dev
         )
         db.add(user)
         db.commit()
         db.refresh(user)
         
     return user
+
+
+async def get_beta_user(user: User = Depends(get_current_user)) -> User:
+    return require_beta_access(user)

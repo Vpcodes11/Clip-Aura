@@ -26,15 +26,16 @@ from sqlalchemy.orm import Session
 from app.config import UPLOAD_DIR, OUTPUT_DIR, BASE_DIR, PRESETS, CAPTION_STYLES, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, STORAGE_MODE, DEV_MODE, S3_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MAX_UPLOAD_SIZE
 from app.api.database import engine, Base, get_db, SessionLocal
 from app.models.models import Job, User
-from app.api.schema_compat import ensure_job_columns
+from app.api.schema_compat import ensure_job_columns, ensure_user_columns
 from app.workers.celery_app import celery_app
 from app.core.storage import storage
-from app.api.auth import get_current_user, get_supabase_client
+from app.api.auth import get_beta_user, get_current_user, get_supabase_client, require_beta_access
 from app.api import payments
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
 ensure_job_columns(engine)
+ensure_user_columns(engine)
 
 
 def validate_caption_style(caption_style: Optional[str]) -> str:
@@ -352,7 +353,7 @@ async def upload_video(
     caption_style: str = Form(DEFAULT_CAPTION_STYLE),
     content_length: Optional[int] = Header(None),
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_beta_user)
 ):
     """Accept video upload or URL and start processing pipeline (Authenticated)"""
     
@@ -503,6 +504,13 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str, token: str = Non
         await websocket.send_json({"type": "error", "message": "Authentication failed. Invalid or missing token."})
         await websocket.close(code=1008)  # Policy Violation
         return
+
+    try:
+        require_beta_access(user)
+    except HTTPException as exc:
+        await websocket.send_json({"type": "error", "message": exc.detail})
+        await websocket.close(code=1008)  # Policy Violation
+        return
         
     # Verify ownership of requested job
     job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
@@ -551,14 +559,14 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str, token: str = Non
 
 
 @app.get("/api/jobs")
-async def get_my_jobs(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+async def get_my_jobs(db: Session = Depends(get_db), user: User = Depends(get_beta_user)):
     """List all jobs for the current user"""
     jobs = db.query(Job).filter(Job.user_id == user.id).order_by(Job.created_at.desc()).all()
     return [serialize_job(job) for job in jobs]
 
 
 @app.get("/api/status/{job_id}")
-async def get_status(job_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+async def get_status(job_id: str, db: Session = Depends(get_db), user: User = Depends(get_beta_user)):
     """Polling fallback for progress updates"""
     job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
     if not job:
@@ -575,7 +583,7 @@ async def get_status(job_id: str, db: Session = Depends(get_db), user: User = De
 
 
 @app.get("/api/preview-url/{job_id}/{filename}")
-async def get_preview_url(job_id: str, filename: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+async def get_preview_url(job_id: str, filename: str, db: Session = Depends(get_db), user: User = Depends(get_beta_user)):
     """Return a short-lived signed preview URL after validating ownership."""
     safe_name = os.path.basename(filename)
     if safe_name != filename or not safe_name:
@@ -603,7 +611,7 @@ def _cloud_redirect(job_id: str, safe_name: str):
 
 
 @app.get("/api/download/{job_id}/{filename}")
-async def download_clip(job_id: str, filename: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+async def download_clip(job_id: str, filename: str, db: Session = Depends(get_db), user: User = Depends(get_beta_user)):
     """Download a generated clip"""
     safe_name = os.path.basename(filename)
     if safe_name != filename or not safe_name:
@@ -663,7 +671,7 @@ async def preview_clip(job_id: str, filename: str, exp: Optional[int] = None, si
 
 
 @app.delete("/api/job/{job_id}")
-async def delete_job(job_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+async def delete_job(job_id: str, db: Session = Depends(get_db), user: User = Depends(get_beta_user)):
     """Clean up job data"""
     job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
     if job:
@@ -685,7 +693,7 @@ async def delete_job(job_id: str, db: Session = Depends(get_db), user: User = De
 
 
 @app.post("/api/job/{job_id}/retry")
-async def retry_job(job_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+async def retry_job(job_id: str, db: Session = Depends(get_db), user: User = Depends(get_beta_user)):
     """Retry a failed or partially completed job from its latest durable checkpoint."""
     job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
     if not job:
@@ -908,7 +916,7 @@ async def edit_clip(
     req: EditClipRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user)
+    user: User = Depends(get_beta_user)
 ):
     """
     Regenerates a specific clip's subtitle captions and text overlays.

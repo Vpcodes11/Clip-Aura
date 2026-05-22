@@ -17,6 +17,7 @@ services:
       - .env
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEV_MODE=false
       - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
     depends_on:
       - redis
@@ -30,7 +31,7 @@ services:
 
   worker:
     build: .
-    command: celery -A app.workers.celery_app worker --loglevel=info
+    command: celery -A app.workers.celery_app worker --loglevel=info --soft-time-limit=540 --time-limit=600 --concurrency=4 --max-tasks-per-child=10
     volumes:
       - ./uploads:/app/uploads
       - ./output:/app/output
@@ -40,6 +41,7 @@ services:
       - .env
     environment:
       - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEV_MODE=false
       - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
     depends_on:
       web:

@@ -253,6 +253,8 @@ if DEV_MODE and ENVIRONMENT in {"production", "prod"}:
 FFMPEG_TIMEOUT_SECONDS = int(os.getenv("FFMPEG_TIMEOUT_SECONDS", "300"))
 FFPROBE_TIMEOUT_SECONDS = int(os.getenv("FFPROBE_TIMEOUT_SECONDS", "30"))
 THUMBNAIL_TIMEOUT_SECONDS = int(os.getenv("THUMBNAIL_TIMEOUT_SECONDS", "30"))
+CELERY_TASK_TIME_LIMIT = int(os.getenv("CELERY_TASK_TIME_LIMIT", "600"))
+CELERY_TASK_SOFT_TIME_LIMIT = int(os.getenv("CELERY_TASK_SOFT_TIME_LIMIT", "540"))
 
 # API Keys (stored in .env file, never committed to git)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")

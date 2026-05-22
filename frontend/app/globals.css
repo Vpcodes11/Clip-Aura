@@ -4,37 +4,40 @@
 :root {
   color-scheme: dark;
 
-  /* Absolute Neutral Bases - Zinc/Black */
   --background: #000000;
-  --background-soft: #09090b; /* Zinc 950 */
+  --background-soft: #09090b;
   --surface: rgba(9, 9, 11, 0.7);
-  --surface-strong: rgba(24, 24, 27, 0.9); /* Zinc 900 */
+  --surface-strong: rgba(24, 24, 27, 0.9);
   --surface-subtle: rgba(255, 255, 255, 0.03);
-  --foreground: #fafafa; /* Zinc 50 */
-  --muted: #a1a1aa; /* Zinc 400 */
-  --muted-strong: #d4d4d8; /* Zinc 300 */
+  --foreground: #fafafa;
+  --muted: #a1a1aa;
+  --muted-strong: #d4d4d8;
   
-  /* Borders and Glass */
-  --border: rgba(255, 255, 255, 0.08);
-  --border-hover: rgba(255, 255, 255, 0.15);
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.1);
   
-  /* Singular Accent: Electric Blue */
   --accent: #0ea5e9;
   --accent-2: #38bdf8;
   --accent-glow: rgba(14, 165, 233, 0.25);
+  --accent-glow-soft: rgba(14, 165, 233, 0.08);
   
   --danger: #ef4444;
   --success: #10b981;
-  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 16px 48px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 8px 40px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 24px 80px rgba(0, 0, 0, 0.6);
+  --shadow-xl: 0 32px 120px rgba(0, 0, 0, 0.7);
 
   --font-outfit: "Outfit", sans-serif;
   --font-body: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
   --radius-sm: 6px;
   --radius: 12px;
   --radius-lg: 20px;
-  --transition: 180ms ease;
-  --transition-slow: 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  --radius-xl: 28px;
+  --transition: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-spring: 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
 @theme {
@@ -68,15 +71,29 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Noise overlay for cinematic texture */
+/* ---------------------------------------------------------------
+   1. AMBIENT TEXTURE OVERLAY — noise + soft radial illumination
+   --------------------------------------------------------------- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(14, 165, 233, 0.03) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 80% 20%, rgba(56, 189, 248, 0.02) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 20% 80%, rgba(14, 165, 233, 0.015) 0%, transparent 70%);
+}
+
 body::after {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.022;
 }
 
 ::selection {
@@ -85,17 +102,17 @@ body::after {
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 ::-webkit-scrollbar-track {
   background: var(--background);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 h1, h2, h3, h4 {
@@ -117,24 +134,84 @@ button, input, select, textarea {
   outline-offset: 2px;
 }
 
-/* Liquid Glass Utilities */
+/* ---------------------------------------------------------------
+   2. LIQUID GLASS — refined with layered borders, edge lighting,
+      hover depth, and GPU-friendly backdrop
+   --------------------------------------------------------------- */
 .liquid-glass {
-  background: linear-gradient(180deg, rgba(24, 24, 27, 0.4), rgba(9, 9, 11, 0.6));
-  backdrop-filter: blur(24px) saturate(1.2);
-  -webkit-backdrop-filter: blur(24px) saturate(1.2);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), var(--shadow-md);
+  position: relative;
+  background: linear-gradient(160deg, rgba(24, 24, 27, 0.5), rgba(9, 9, 11, 0.7));
+  backdrop-filter: blur(20px) saturate(1.1);
+  -webkit-backdrop-filter: blur(20px) saturate(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    var(--shadow-md);
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+
+.liquid-glass:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 12px 60px rgba(0, 0, 0, 0.6);
+}
+
+.liquid-glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(ellipse 80% 30% at 50% 0%, rgba(14, 165, 233, 0.04), transparent);
+  opacity: 0;
+  transition: opacity var(--transition-slow);
+}
+
+.liquid-glass:hover::after {
+  opacity: 1;
 }
 
 .liquid-glass-strong {
+  position: relative;
   background: rgba(9, 9, 11, 0.85);
   backdrop-filter: blur(32px) saturate(1.2);
   -webkit-backdrop-filter: blur(32px) saturate(1.2);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--shadow-lg);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    var(--shadow-lg);
+  transition: border-color var(--transition), box-shadow var(--transition-slow), transform var(--transition);
 }
 
-/* Navigation */
+.liquid-glass-strong:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 24px 100px rgba(0, 0, 0, 0.7);
+}
+
+/* Edge-light border effect — subtle rim lighting */
+.glass-rim {
+  position: relative;
+}
+
+.glass-rim::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(160deg, rgba(255,255,255,0.12), rgba(255,255,255,0.02) 40%, transparent 70%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------------
+   3. NAVIGATION
+   --------------------------------------------------------------- */
 .stealth-nav {
   position: fixed;
   top: 0;
@@ -144,9 +221,10 @@ button, input, select, textarea {
   align-items: center;
   width: 100%;
   height: 80px;
-  background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255,255,255,0.03);
+  background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
 }
 
 .nav-container {
@@ -160,30 +238,38 @@ button, input, select, textarea {
 .logo-text {
   font-family: var(--font-outfit);
   font-weight: 800;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   font-size: 18px;
   text-transform: uppercase;
 }
 
-/* Buttons */
+/* ---------------------------------------------------------------
+   4. BUTTONS
+   --------------------------------------------------------------- */
 .btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px 24px;
+  padding: 12px 28px;
   background: var(--foreground);
   color: var(--background);
   font-family: var(--font-body);
   font-weight: 700;
   font-size: 14px;
-  border-radius: 8px;
-  transition: transform var(--transition), opacity var(--transition);
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: transform var(--transition), opacity var(--transition), box-shadow var(--transition);
+  will-change: transform;
 }
+
 .btn-primary:hover {
   transform: translateY(-1px);
-  opacity: 0.9;
+  opacity: 0.92;
+  box-shadow: 0 4px 24px rgba(255, 255, 255, 0.08);
 }
+
 .btn-primary:active {
   transform: scale(0.98);
 }
@@ -199,20 +285,28 @@ button, input, select, textarea {
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 14px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid var(--border);
+  cursor: pointer;
   transition: all var(--transition);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
+
 .btn-secondary:hover {
   background: rgba(255,255,255,0.06);
   border-color: var(--border-hover);
   transform: translateY(-1px);
+  box-shadow: 0 2px 16px rgba(255, 255, 255, 0.03);
 }
+
 .btn-secondary:active {
   transform: scale(0.98);
 }
 
-/* Layout Utilities */
+/* ---------------------------------------------------------------
+   5. LAYOUT UTILITIES
+   --------------------------------------------------------------- */
 .page-container {
   width: min(100% - 48px, 1280px);
   margin: 0 auto;
@@ -223,4 +317,124 @@ button, input, select, textarea {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+/* Section divider — hairline with subtle glow */
+.section-divider {
+  position: relative;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06) 20%, rgba(255,255,255,0.06) 80%, transparent);
+}
+
+/* ---------------------------------------------------------------
+   6. SCROLL REVEAL — GPU-friendly fade-up
+   --------------------------------------------------------------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Stagger children */
+.reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-stagger.visible > *:nth-child(1) { transition-delay: 0.05s; }
+.reveal-stagger.visible > *:nth-child(2) { transition-delay: 0.1s; }
+.reveal-stagger.visible > *:nth-child(3) { transition-delay: 0.15s; }
+.reveal-stagger.visible > *:nth-child(4) { transition-delay: 0.2s; }
+.reveal-stagger.visible > *:nth-child(5) { transition-delay: 0.25s; }
+.reveal-stagger.visible > *:nth-child(6) { transition-delay: 0.3s; }
+
+.reveal-stagger.visible > * {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ---------------------------------------------------------------
+   7. COMPUTATIONAL LIVE — animated processing indicators
+   --------------------------------------------------------------- */
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@keyframes waveform-pulse {
+  0%, 100% { height: 4px; opacity: 0.3; }
+  50% { height: 24px; opacity: 0.8; }
+}
+
+@keyframes progress-indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+
+.scanline {
+  position: absolute;
+  inset-x: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(14, 165, 233, 0.2), transparent);
+  animation: scanline 4s linear infinite;
+  pointer-events: none;
+}
+
+.waveform-bar {
+  width: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  animation: waveform-pulse 1.4s ease-in-out infinite;
+  will-change: height, opacity;
+}
+
+/* ---------------------------------------------------------------
+   8. PREMIUM HOVER CARD — depth transition with edge glow
+   --------------------------------------------------------------- */
+.hover-lift {
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+  will-change: transform;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ---------------------------------------------------------------
+   9. RESPONSIVE UTILITIES
+   --------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .page-container {
+    width: min(100% - 32px, 1280px);
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    padding: 11px 20px;
+    font-size: 13px;
+  }
+
+  .stealth-nav {
+    height: 64px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .reveal, .reveal-stagger > * {
+    opacity: 1;
+    transform: none;
+  }
 }

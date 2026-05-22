@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.database import get_db
 from app.models.models import User
 from app.config import STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRO_PRICE_ID
-from app.api.auth import get_current_user
+from app.api.auth import get_beta_user
 
 stripe.api_key = STRIPE_SECRET_KEY
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
@@ -48,7 +48,7 @@ def find_user_by_customer(db: Session, customer_id: str | None):
     return db.query(User).filter(User.stripe_customer_id == customer_id).first()
 
 @router.post("/create-checkout-session")
-async def create_checkout_session(user: User = Depends(get_current_user)):
+async def create_checkout_session(user: User = Depends(get_beta_user)):
     """Create a Stripe Checkout session for subscription"""
     if not STRIPE_SECRET_KEY or not STRIPE_PRO_PRICE_ID:
         raise HTTPException(status_code=503, detail="Billing is not configured.")

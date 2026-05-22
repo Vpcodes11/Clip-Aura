@@ -69,7 +69,10 @@ def split_audio(audio_path, chunk_dir, chunk_duration=AUDIO_CHUNK_DURATION):
             '-ss', str(start), '-t', str(chunk_duration),
             '-acodec', 'copy', '-y', chunk_path
         ]
-        subprocess.run(cmd, capture_output=True, check=True, timeout=FFMPEG_TIMEOUT_SECONDS)
+        try:
+            subprocess.run(cmd, capture_output=True, check=True, timeout=FFMPEG_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError("Audio chunk split timed out.") from exc
         chunks.append((chunk_path, start))
         start += chunk_duration
         i += 1

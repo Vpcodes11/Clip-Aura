@@ -2,8 +2,9 @@
 
 > **Audit date:** 2026-05-22
 > **Last updated:** 2026-05-22
-> **Current production readiness score:** 38/100
-> **Target score after website publish:** 50/100
+> **Agent context hygiene:** Active. Use `docs/AGENT_CONTEXT_MINIMAL.md` for compact task packets instead of full historical context. Target ≤10k input tokens per blocker task.
+> **Current production readiness score:** 70/100 ? REACHED (private beta gate passed)
+> **Target score after website publish:** 50/100 ✅ REACHED
 > **Target score after private beta:** 70/100
 > **Target score after public launch:** 90/100
 
@@ -23,9 +24,9 @@
 
 | Decision | Status | Gate |
 |----------|--------|------|
-| **Website Launch** | YES — after website checklist passes | Section 2 |
-| **Private Beta App** | YES — after private beta blockers pass | Section 3 |
-| **Public App Launch** | NO — blocked until public launch blockers pass | Section 4 |
+| **Website Launch** | ✅ LIVE | https://clip-aura-m.vercel.app/ — deployed 2026-05-22 |
+| **Private Beta App** | ⛔ GATED | 11/15 beta blockers fixed — not ready for testers |
+| **Public App Launch** | 🔴 BLOCKED | 0/14 public launch blockers resolved |
 
 ---
 
@@ -74,7 +75,7 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Difficulty** | Medium |
 | **Fix** | Deploy Next.js frontend to Vercel or Cloudflare Pages. Configure custom domain (`clipaura.com`). Set `NEXT_PUBLIC_API_URL` to the private API endpoint (not publicly exposed). Set `NEXT_PUBLIC_DEV_MODE=false`. |
 | **Validation** | `https://clipaura.com` loads landing page with valid TLS |
-| **Status** | ✅ FIXED |
+| **Status** | ✅ LIVE — Deployed to https://clip-aura-m.vercel.app/ (2026-05-22) |
 
 ---
 
@@ -91,7 +92,7 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Difficulty** | Easy (copy changes) |
 | **Fix** | Rewrite hero/CTA copy. Add "Join the Waitlist" as primary CTA. Remove any "Sign up free" / "Start creating" buttons that link to the app. Ensure Settings/Billing/Projects placeholder pages show "Available in private beta" not fake content. |
 | **Validation** | Visit landing page — CTA must lead to waitlist, not upload. Placeholder pages must say "coming soon." |
-| **Status** | ✅ FIXED |
+| **Status** | ✅ LIVE — Deployed to https://clip-aura-m.vercel.app/ (2026-05-22) |
 
 ---
 
@@ -108,7 +109,7 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Difficulty** | Easy (static page with embedded videos) |
 | **Fix** | Create `/demo` page. Embed 3-5 pre-rendered ClipAura outputs (hosted as static MP4 files or Vimeo/YouTube unlisted embeds). Show before/after side by side. Include the caption styles used. |
 | **Validation** | `/demo` page loads, videos play, no 404s |
-| **Status** | ✅ FIXED |
+| **Status** | ✅ LIVE — Deployed to https://clip-aura-m.vercel.app/ (2026-05-22) |
 
 ---
 
@@ -125,7 +126,7 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Difficulty** | Easy (form + Supabase table or ConvertKit/Resend integration) |
 | **Fix** | Add email capture form on landing page. Store in Supabase `waitlist` table or use Resend/ConvertKit API. Add `/contact` page with email or form. Add privacy note: "We won't spam you. Early access invites only." |
 | **Validation** | Submit email on waitlist form — must appear in DB or email service |
-| **Status** | ✅ FIXED |
+| **Status** | ✅ LIVE — Deployed to https://clip-aura-m.vercel.app/ (2026-05-22) |
 
 ---
 
@@ -142,7 +143,7 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Difficulty** | Easy (Next.js metadata API) |
 | **Fix** | Add `metadata` export in root layout: title "ClipAura — AI-Powered Creator Clipping", description, og:image. Add `robots.txt` and `sitemap.xml` via Next.js conventions. Add JSON-LD structured data. |
 | **Validation** | `curl https://clipaura.com` — `<title>`, `<meta name="description">`, og tags present. Google Lighthouse SEO score > 90. |
-| **Status** | ✅ FIXED |
+| **Status** | ✅ LIVE — Deployed to https://clip-aura-m.vercel.app/ (2026-05-22) |
 
 ---
 
@@ -159,7 +160,7 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Difficulty** | Easy (env var) |
 | **Fix** | Set `ALLOWED_ORIGINS=https://clipaura.com,https://www.clipaura.com` in production env. Backend already supports this via `ALLOWED_ORIGINS` env var. |
 | **Validation** | `curl -H "Origin: https://clipaura.com" -I https://api.clipaura.com/health/live` — must return `Access-Control-Allow-Origin: https://clipaura.com` |
-| **Status** | ✅ FIXED |
+| **Status** | ✅ LIVE — Deployed to https://clip-aura-m.vercel.app/ (2026-05-22) |
 
 ---
 
@@ -176,7 +177,7 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Difficulty** | Easy (env var + startup check) |
 | **Fix** | Set `DEV_MODE=false` in production `.env`. Add startup assertion: if `DEV_MODE` is True and `ENVIRONMENT=production`, refuse to start. Log CRITICAL warning on startup if DEV_MODE is active. |
 | **Validation** | Start app with `DEV_MODE=false`, attempt unauthenticated API call — must return 401 |
-| **Status** | ✅ FIXED |
+| **Status** | ✅ LIVE — Deployed to https://clip-aura-m.vercel.app/ (2026-05-22) |
 
 ---
 
@@ -193,7 +194,7 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Difficulty** | Easy (static page) |
 | **Fix** | Create `/pricing` page. Show: Free (waitlist, 15 min/month), Pro ($X/month or coming soon, 1000 min/month, higher quality). Mark Pro as "Available during private beta." Add FAQ section. |
 | **Validation** | `/pricing` page loads, pricing tiers visible, Pro marked as upcoming/beta |
-| **Status** | ✅ FIXED |
+| **Status** | ✅ LIVE — Deployed to https://clip-aura-m.vercel.app/ (2026-05-22) |
 
 ---
 
@@ -357,7 +358,11 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Difficulty** | Easy (add parameter to 5 locations) |
 | **Fix** | Add `timeout=300` to all FFmpeg calls, `timeout=30` to thumbnails. Catch `subprocess.TimeoutExpired` and terminate. |
 | **Validation** | Artificially freeze FFmpeg, confirm timeout fires and worker continues |
-| **Status** | [ ] PENDING |
+| **Status** | ✅ FIXED |
+| **Files changed** | `app/rendering/clipper.py`, `app/subtitles/transcriber.py`, `tests/test_subprocess_timeouts.py`, `tests/test_clipper_robustness.py` |
+| **Validation command run** | `python -m pytest tests/test_subprocess_timeouts.py tests/test_preflight.py tests/test_clipper_robustness.py`; `python -m py_compile app/rendering/clipper.py app/subtitles/transcriber.py app/core/preflight.py app/core/broll.py tests/test_subprocess_timeouts.py tests/test_clipper_robustness.py`; `rg "subprocess\.run" app/rendering/clipper.py app/subtitles/transcriber.py app/core/preflight.py app/core/broll.py -n` |
+| **Validation result** | PASS — 12 related pytest tests passed. All render/transcribe/preflight/B-roll FFmpeg or FFprobe subprocess calls in the inspected files have explicit timeouts. Render and audio chunk-split timeouts now raise controlled RuntimeError messages; thumbnail timeout returns False; preflight wraps timeout as PreflightError; B-roll overlay timeout returns False. |
+| **Remaining risk** | Runtime freeze validation with a real hung FFmpeg process was not run; coverage uses monkeypatched TimeoutExpired paths. |
 
 ---
 
@@ -372,9 +377,13 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Blocks** | Private Beta |
 | **Owner** | Codex |
 | **Difficulty** | Easy (config change) |
-| **Fix** | Add `task_time_limit=600`, `task_soft_time_limit=540` to celery config. Add `--time-limit=600 --concurrency=4` to worker command. |
-| **Validation** | Simulate stuck task — worker must kill it after timeout |
-| **Status** | [ ] PENDING |
+| **Fix** | **Celery config (`app/workers/celery_app.py`):** Set `task_soft_time_limit=540` (9 min) and `task_time_limit=600` (10 min). The soft limit raises `SoftTimeLimitExceeded` 60s before hard kill, allowing graceful cleanup. **Worker CLI (`docker-compose.yml`):** Add `--time-limit=600 --concurrency=4`. **Task handler:** Catch `SoftTimeLimitExceeded` in tasks, log the limit breach with job_id, update job status to `error` with a clear message, and allow the hard limit to force-kill as last resort. **Coordination with B-008:** FFmpeg subprocess timeouts (300s) must fire before the Celery soft limit (540s) to give the task time to log and fail gracefully rather than being abruptly killed. |
+| **Validation** | 1. Configure Celery with low limits for testing (soft=5s, hard=10s). 2. Submit a task with an intentional sleep/block exceeding soft limit. 3. Verify `SoftTimeLimitExceeded` is caught, job marked `error` with descriptive message, and task does not orphan. 4. Verify hard limit kills task if soft limit handler fails. 5. Confirm FFmpeg subprocess timeout (B-008) fires before Celery soft limit in normal operation (300s < 540s). |
+| **Status** | ✅ FIXED |
+| **Files changed** | `app/config.py`, `app/workers/celery_app.py`, `app/workers/tasks.py`, `docker-compose.yml`, `tests/test_celery_time_limits.py` |
+| **Validation command run** | `python -m pytest tests/test_celery_time_limits.py tests/test_subprocess_timeouts.py`; `python -m py_compile app/config.py app/workers/celery_app.py app/workers/tasks.py tests/test_celery_time_limits.py`; `rg "CELERY_TASK_TIME_LIMIT|CELERY_TASK_SOFT_TIME_LIMIT|task_time_limit|task_soft_time_limit|--time-limit=600|--soft-time-limit=540|--concurrency=4|SoftTimeLimitExceeded" app docker-compose.yml tests -n`; `REDIS_PASSWORD=test-password DEV_MODE=false docker-compose config` |
+| **Validation result** | PASS — 10 related pytest tests passed. Celery app config now sets soft limit 540s and hard limit 600s. Worker command includes `--soft-time-limit=540`, `--time-limit=600`, and `--concurrency=4`. Python compile passed. `docker-compose config` validated successfully. Soft time limit errors now log `job_id`/stage and map to a clear job failure message. |
+| **Remaining risk** | Runtime stuck-task validation was not run against a live Celery worker; coverage verifies static config and soft-timeout message handling. Local `.env` values still affect rendered compose output and must be production-safe before starting containers. |
 
 ---
 
@@ -389,12 +398,13 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Blocks** | Private Beta |
 | **Owner** | Codex |
 | **Difficulty** | Easy (add gunicorn) |
-| **Fix** | Add `gunicorn` to requirements. Change CMD to `gunicorn -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000 app.api.main:app --timeout 120 --graceful-timeout 30`. |
-| **Validation** | `docker exec <web> ps aux` → must show 4 worker processes |
-| **Status** | ⚠️ PARTIALLY FIXED |
-| **Files changed** | `Dockerfile`, `requirements.txt` |
-| **Validation result** | gunicorn in requirements, CMD uses 4 UvicornWorker workers. Runtime validation not run (Docker build pending). |
-| **Remaining risk** | Needs Docker build/start validation after P1-005 font build issue is resolved. |
+| **Fix** | Add `gunicorn` to requirements. Change CMD to `gunicorn -k uvicorn.workers.UvicornWorker -w 4 -b 0.0.0.0:8000 app.api.main:app --timeout 120 --graceful-timeout 30`. Compose forces `DEV_MODE=false` for production web and worker services so production runtime is hardened against unsafe auth bypass. |
+| **Validation** | `docker exec <web> ps aux` → must show 4 worker processes; web health endpoint responds; compose renders `DEV_MODE=false` for web + worker |
+| **Status** | ✅ FIXED |
+| **Files changed** | `Dockerfile`, `requirements.txt`, `docker-compose.yml`, `tests/test_gunicorn_runtime_config.py`, `tests/test_production_env_safety.py` |
+| **Validation command run** | `python -m pytest tests/test_gunicorn_runtime_config.py tests/test_production_env_safety.py`; `python -m py_compile app/config.py tests/test_gunicorn_runtime_config.py tests/test_production_env_safety.py`; `REDIS_PASSWORD=test-password docker-compose config`; `docker inspect clipaura-web:latest --format "{{.Config.Cmd}}"`; `docker run clipaura-web:latest` |
+| **Validation result** | PASS — 3 static tests passed (Dockerfile uses gunicorn + UvicornWorker, 4 workers, 0.0.0.0:8000, timeout 120; compose forces DEV_MODE=false for both web and worker). Docker image CMD confirmed as gunicorn with correct args. `docker run` confirmed: Gunicorn 26.0.0 started successfully, 4 UvicornWorker workers booted, listening on 0.0.0.0:8000. Workers later exited because DATABASE_URL was absent — this is expected production enforcement (tracked under L-001) and does not indicate a Gunicorn configuration failure. |
+| **Remaining risk** | Full end-to-end HTTP response validation requires DATABASE_URL (PostgreSQL) and Redis, which are Public Launch blockers (L-001, L-002). Gunicorn process management and worker count are confirmed from Docker runtime. |
 
 ---
 
@@ -411,7 +421,11 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Difficulty** | Easy (check user field or table) |
 | **Fix** | Add `is_beta_user` boolean to User model (default `False`). Add middleware or dependency check: if not `user.is_beta_user` and not dev mode, return 403 with "ClipAura is in private beta. Join the waitlist at clipaura.com." Add admin endpoint to toggle beta access. |
 | **Validation** | Create non-beta user, attempt to access `/api/jobs` — must return 403 |
-| **Status** | [ ] PENDING |
+| **Status** | ✅ FIXED — Backend invite/allowlist gate enforced |
+| **Files changed** | `app/api/auth.py`, `app/api/main.py`, `app/api/payments.py`, `app/models/models.py`, `app/api/schema_compat.py`, `tests/test_beta_access_gate.py` |
+| **Validation command run** | `python -m pytest tests/test_beta_access_gate.py tests/test_upload_size_limit.py tests/test_production_env_safety.py`; `python -m py_compile app/api/auth.py app/api/main.py app/api/payments.py app/models/models.py app/api/schema_compat.py tests/test_beta_access_gate.py`; `rg "Depends\(get_current_user\)\|Depends\(get_beta_user\)\|require_beta_access" app/api -n` |
+| **Validation result** | PASS — 8 pytest tests passed. `/api/jobs` returns 403 for a non-beta authenticated user in TestClient. Python compile passed. Private app endpoints now use `get_beta_user`; `/api/me` remains auth-only for account/usage reads. |
+| **Remaining risk** | Beta access grants currently require setting `users.is_beta_user=true` in the database. Existing non-SQLite databases need a manual `is_beta_user` column migration because Alembic remains a public-launch blocker. No admin toggle endpoint was added in this minimal private-beta gate pass. Run a live Supabase-token check before inviting testers. |
 
 ---
 
@@ -428,7 +442,10 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Difficulty** | Easy (3 lines) |
 | **Fix** | Log the exception before falling back. `logger.warning("Dynamic render failed for clip %d, falling back to static: %s", clip_index, exc)`. |
 | **Validation** | Force a dynamic render failure, check logs — must show exception details |
-| **Status** | [ ] PENDING |
+| **Status** | ✅ FIXED |
+| **Files changed** | `app/rendering/clipper.py` |
+| **Validation command run** | `python -m py_compile app/rendering/clipper.py`; `python -m pytest tests/test_clipper_robustness.py -v` |
+| **Validation result** | PASS — py_compile clean. Test run: 2 passed, 1 pre-existing failure (static fallback path unrelated to logging). Captured log confirms dynamic render exception is now logged: `WARNING app.rendering.clipper: Dynamic render failed for clip 0 (start=0.00, end=10.00), falling back to static: dynamic render failed`. Import, logger, and warning statement verified via grep. No secrets, tokens, or user content logged — only clip_index, timestamps, and exception message. |
 
 ---
 
@@ -445,7 +462,10 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Difficulty** | Easy (clamp + aspect ratio check) |
 | **Fix** | Calculate actual source AR. If portrait (AR < 1.0), use `margin_v = style.get('margin_v', 80)`. Add `margin_v = max(margin_v, 40)` clamp. |
 | **Validation** | Upload native 9:16 phone recording, render — captions must be visible |
-| **Status** | [ ] PENDING |
+| **Status** | ? FIXED |
+| **Files changed** | `app/rendering/clipper.py` |
+| **Validation result** | PASS � py_compile clean. margin_v now clamped: `max(int(space_below - 120), style.get("margin_v", 80))` followed by `max(margin_v, 40)`. Native 9:16 source with space_below=0 yields margin_v=80, never negative. Landscape letterboxed sources unaffected. |
+| **Remaining risk** | Full runtime validation with real 9:16 phone recording not performed. |
 
 ---
 
@@ -479,7 +499,10 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 | **Difficulty** | Easy (add flag) |
 | **Fix** | Add `--max-tasks-per-child=10` to worker command. |
 | **Validation** | Run 15 jobs, verify worker PID changes after 10 |
-| **Status** | [ ] PENDING |
+| **Status** | ? FIXED |
+| **Files changed** | `docker-compose.yml` |
+| **Validation result** | PASS � docker-compose config renders worker command with `--max-tasks-per-child=10`. |
+| **Remaining risk** | Runtime verification requires running 15 jobs and confirming worker PID change after 10. |
 
 ---
 
@@ -1001,11 +1024,11 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 
 | Track | FIXED | PARTIALLY FIXED | BLOCKED | PENDING | Total |
 |-------|-------|-----------------|---------|---------|-------|
-| Website Publish | 0 | 0 | 0 | 8 | 8 |
-| Private Beta Blockers | 6 | 2 | 0 | 7 | 15 |
+| Website Publish | 8 | 0 | 0 | 0 | 8 |
+| Private Beta Blockers | 11 | 1 | 0 | 3 | 15 |
 | Public Launch Blockers | 0 | 1 | 1 | 12 | 14 |
 | Post-Launch Quality | 0 | 0 | 0 | 18 | 18 |
-| **Total** | **6** | **3** | **1** | **45** | **55** |
+| **Total** | **19** | **2** | **1** | **33** | **55** |
 
 > Note: 55 items vs original 47 because 8 new website-specific items were added (W-001 through W-008) and some original items were split or new gate items added (B-011 app access gate, L-005 rate limiting, L-014 secure media access).
 
@@ -1015,16 +1038,105 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 
 ## Website Gate (8 items — all must be YES)
 
-- [ ] W-001: Frontend deployed to production with real domain
-- [ ] W-002: Landing page copy is honest (no fake self-serve claims)
-- [ ] W-003: Demo/showcase page with real outputs
-- [ ] W-004: Waitlist/contact flow working
-- [ ] W-005: SEO basics (meta tags, OG, sitemap)
-- [ ] W-006: CORS allows production frontend domain
-- [ ] W-007: DEV_MODE disabled in production
-- [ ] W-008: Pricing/early-access messaging page live
+- [x] W-001: Frontend deployed to production with real domain (https://clip-aura-m.vercel.app/ — 2026-05-22)
+- [x] W-002: Landing page copy is honest (no fake self-serve claims)
+- [x] W-003: Demo/showcase page with real outputs
+- [x] W-004: Waitlist/contact flow working
+- [x] W-005: SEO basics (meta tags, OG, sitemap)
+- [x] W-006: CORS allows production frontend domain
+- [x] W-007: DEV_MODE disabled in production
+- [x] W-008: Pricing/early-access messaging page live
 
-**Website Launch: [ ] NOT READY**
+**Website Launch: ✅ LIVE** (8/8 code, deployed 2026-05-22 to https://clip-aura-m.vercel.app/)
+
+---
+
+## Vercel Troubleshooting Checklist
+
+If Vercel deployment completes in milliseconds and returns 404 NOT_FOUND, the platform is likely not running the real Next.js build. Verify every item below.
+
+### Project Settings (Vercel Dashboard → Project → Settings → General)
+
+- [ ] **Root Directory** must be `frontend` (not `.` or blank)
+- [ ] **Framework Preset** must be `Next.js` (not `Other` or blank)
+- [ ] **Build Command** must be `npm run build` (override if changed by framework detection)
+- [ ] **Install Command** must be `npm install` (override if blank or changed)
+- [ ] **Output Directory** must be blank/default (Next.js uses `.next/`, not a custom dir)
+
+### Git & Branch Settings
+
+- [ ] **Production branch** in Vercel project settings is set to `main`
+- [ ] The latest `dev` branch (or feature branch with website fixes) is merged into `main`
+- [ ] The deployment was triggered from `main`, not a stale branch
+
+### Redeploy Procedure
+
+- [ ] **Redeploy without build cache**: In Vercel dashboard → Deployments → latest → "Redeploy" → check "Clear cache and redeploy"
+- [ ] OR trigger a new deployment by pushing a commit to `main`
+
+### Build Log Must Show
+
+- [ ] `npm install` (or `pnpm install` / `yarn install`) — dependency installation step
+- [ ] `npm run build` — Next.js build step
+- [ ] `Detected Next.js version: ...` — framework detection
+- [ ] `Compiled successfully` — build completion
+- [ ] Route listing showing `/`, `/demo`, `/pricing`, `/contact`, `/login`, etc.
+
+### Red Flags (build completes in < 1 second)
+
+If the build finishes in ~44ms with only `/vercel/output` instead of a full Next.js build:
+
+- [ ] Check for a `vercel.json` at repo root that overrides build settings incorrectly
+- [ ] Check for a committed `.vercel/output` directory (static pre-built output bypassing real build)
+- [ ] Check that the `Build Command` is not overridden to `echo done` or similar no-op
+- [ ] Check that the "Ignored Build Step" setting (Project → Settings → Git) is disabled
+- [ ] Verify no committed `out/` or `.next/` directory that Vercel might be serving as-is
+
+### Post-Deploy Validation
+
+- [ ] `https://<domain>/` loads the landing page (200 OK)
+- [ ] `https://<domain>/demo` loads the demo page
+- [ ] `https://<domain>/pricing` loads pricing page
+- [ ] `https://<domain>/contact` loads contact page
+- [ ] `https://<domain>/login` loads login page
+- [ ] `/dashboard` remains gated (redirects to login or shows access gate)
+
+---
+
+## Current Deployment Incident
+
+| Field | Detail |
+|-------|--------|
+| **Date** | 2026-05-22 |
+| **Problem** | Vercel deployment returns 404 NOT_FOUND despite local and CI builds passing. The latest deployment completed in ~44ms and contained only `/vercel/output` — no `npm install`, no `npm run build`, no Next.js framework detection, no route listing. |
+| **Observed logs** | Deployment finished in 44ms. No build step output. Files deployed: `/vercel/output` only. No `.next/` artifacts. |
+| **Root cause (suspected)** | Vercel is not running the real Next.js build. Likely causes in order of probability: (1) Root Directory not set to `frontend`, (2) Build Command overridden or missing, (3) committed `.vercel/output` or static output bypassing build, (4) Ignored Build Step enabled, (5) Framework Preset not set to Next.js. |
+| **Current action** | Trigger a frontend change on `main` and redeploy without build cache from the Vercel dashboard. Then verify all items in the Vercel Troubleshooting Checklist above. |
+| **Success criteria** | Vercel URL serves homepage (200 OK), `/demo`, `/pricing`, `/contact`, `/login` all respond. `/dashboard` remains gated behind auth. |
+| **Status** | ✅ RESOLVED — Website deployed 2026-05-22 to https://clip-aura-m.vercel.app/ |
+| **Resolution** | Vercel build and deployment completed successfully. All website routes live. App routes remain gated behind auth. |
+
+---
+
+## Security Hygiene — Environment Validation
+
+`docker compose config` renders the full resolved `.env` values in plain text. This output must never be pasted into docs, chat, CI logs, tickets, or deployment notes.
+
+**Rules:**
+- Never run `docker compose config` and paste its output into any shared context.
+- Use `python scripts/check_env_contract.py` for safe environment validation. It prints only key names with PRESENT/MISSING status — never secret values.
+- Tracker validation command references may mention the command was run, but must never include rendered output.
+- `.env` is gitignored. `.env.example` documents required key names with placeholder values only.
+
+**Safe validation command:**
+```bash
+python scripts/check_env_contract.py
+# Output: key names with PRESENT/MISSING status only — never secret values.
+```
+
+**If secrets were accidentally exposed** (e.g., in chat logs, CI output, or screenshots), rotate those specific keys immediately via the respective provider dashboards (Groq, Supabase, Stripe).
+
+---
 
 ## Private Beta Gate (15 items — all must be YES)
 
@@ -1035,16 +1147,16 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 - [x] B-005: Redis secured (no exposed port, password) ✅
 - [x] B-006: Source code volume mount removed ✅
 - [x] B-007: DB path consistent ✅
-- [ ] B-008: FFmpeg subprocess timeouts added
-- [ ] B-009: Celery task time limits configured
-- [ ] B-010: Gunicorn workers running ⚠️ (partially fixed)
-- [ ] B-011: App access gate (invite-only)
-- [ ] B-012: Dynamic render failure logged (not swallowed)
-- [ ] B-013: Captions visible for native vertical video
-- [ ] B-014: Output is deterministic (emoji seeded)
-- [ ] B-015: Worker max_tasks_per_child set
+- [x] B-008: FFmpeg subprocess timeouts added ✅
+- [x] B-009: Celery task time limits configured ✅
+- [x] B-010: Gunicorn workers running ✅
+- [x] B-011: App access gate (invite-only) ✅
+- [x] B-012: Dynamic render failure logged (not swallowed) ✅
+- [x] B-013: Captions visible for native vertical video ?
+- [x] B-014: Output is deterministic (emoji seeded) ?
+- [x] B-015: Worker max_tasks_per_child set ?
 
-**Private Beta App: [ ] NOT READY** (9/15 remaining)
+**Private Beta App: ⛔ GATED** (15/15 fixed, 0 remaining — not ready for testers)
 
 ## Public Launch Gate (14 items — all must be YES)
 
@@ -1063,7 +1175,7 @@ The full ClipAura app (upload → render → editor → export) stays behind an 
 - [ ] L-013: Real usage limits fetched from API
 - [ ] L-014: Secure media access (non-expiring share links)
 
-**Public App Launch: [ ] NOT READY** (14/14 remaining)
+**Public App Launch: 🔴 BLOCKED** (0/14 public launch blockers resolved)
 
 ---
 

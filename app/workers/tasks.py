@@ -2,8 +2,10 @@ import os
 import json
 import redis
 import math
+import logging
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from celery.exceptions import SoftTimeLimitExceeded
 from app.workers.celery_app import celery_app
 from app.api.database import SessionLocal, engine, Base
 from app.models.models import Job, User
@@ -17,6 +19,8 @@ from app.core.storage import storage
 from app.core.cut_aligner import align_clip_boundaries
 from app.core.broll import apply_broll
 from app.core.preflight import preflight_source
+
+logger = logging.getLogger(__name__)
 
 # Ensure tables exist for the worker
 Base.metadata.create_all(bind=engine)
@@ -98,19 +102,28 @@ def append_job_error(db, job, stage, message, clip_index=None, detail=None):
     db.commit()
 
 
+def format_job_error_message(exc):
+    if isinstance(exc, SoftTimeLimitExceeded):
+        return "Celery task soft time limit exceeded."
+    return str(exc)
+
+
 def handle_job_error(db, job_id, stage, exc, tb):
     """Mark a job as errored in the DB and broadcast the failure over Redis."""
+    message = format_job_error_message(exc)
+    if isinstance(exc, SoftTimeLimitExceeded):
+        logger.warning("Celery task soft time limit exceeded for job_id=%s stage=%s", job_id, stage or "unknown")
     db.rollback()
     job = get_job_or_none(db, job_id)
     if job:
-        append_job_error(db, job, stage or "unknown", str(exc), detail=tb)
+        append_job_error(db, job, stage or "unknown", message, detail=tb)
         job.status = 'error'
-        job.message = str(exc)
+        job.message = message
         job.progress = 0
         db.commit()
     publish_message(f"job_progress_{job_id}", {
         'type': 'error',
-        'message': str(exc)
+        'message': message
     })
 
 
@@ -336,7 +349,7 @@ def process_video_job_impl(job_id):
 
     except Exception as e:
         handle_job_error(db, job_id, job.stage if job else "unknown", e, traceback.format_exc())
-        return f"Job {job_id} failed: {str(e)}"
+        return f"Job {job_id} failed: {format_job_error_message(e)}"
     finally:
         db.close()
 
@@ -373,5 +386,6 @@ def download_and_process_job(self, job_id, url, job_dir):
 
     except Exception as e:
         handle_job_error(db, job_id, "download", e, traceback.format_exc())
+        return f"Job {job_id} failed: {format_job_error_message(e)}"
     finally:
         db.close()
