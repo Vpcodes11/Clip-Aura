@@ -300,8 +300,13 @@ export default function Home() {
           ================================================================ */}
       <section
         id="waitlist"
-        className="relative border-t border-white/5 bg-zinc-950/80 py-24 md:py-32"
+        className="relative border-t border-white/[0.08] bg-[#07090c] py-24 md:py-32 overflow-hidden"
       >
+        {/* Atmospheric depth behind section */}
+        <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-sky-500/[0.03] blur-[120px] rounded-full"></div>
+          <div className="absolute bottom-0 left-1/4 w-[600px] h-[300px] bg-sky-500/[0.02] blur-[100px] rounded-full"></div>
+        </div>
         <div className="page-container">
           <div className="text-center mb-16 reveal">
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-5">Elite Architecture. Closed Beta.</h2>
@@ -314,7 +319,7 @@ export default function Home() {
 
             {/* Creator Edition Card */}
             <div className="liquid-glass glass-rim flex h-full flex-col rounded-3xl p-[3px]">
-              <div className="flex min-h-[420px] flex-1 flex-col rounded-[22px] border border-white/5 bg-zinc-950/80 p-8 md:p-10">
+              <div className="flex min-h-[420px] flex-1 flex-col rounded-[22px] border border-white/[0.08] bg-[#0a0d12]/90 p-8 md:p-10">
                 <div className="text-lg font-bold text-white mb-2">Creator Edition</div>
                 <div className="text-5xl font-outfit tracking-tighter text-white mb-6">
                   $49<span className="text-lg text-zinc-500 font-body tracking-normal">/mo</span>
@@ -338,7 +343,7 @@ export default function Home() {
 
             {/* Waitlist Card */}
             <div className="liquid-glass glass-rim flex h-full flex-col rounded-3xl p-[3px]">
-              <div className="flex min-h-[420px] flex-1 flex-col rounded-[22px] border border-white/5 bg-zinc-950/80 p-8 md:p-10">
+              <div className="flex min-h-[420px] flex-1 flex-col rounded-[22px] border border-white/[0.08] bg-[#0a0d12]/90 p-8 md:p-10">
                 <div className="flex items-center gap-4 mb-4">
                   <EnvelopeSimple size={32} className="text-zinc-500" />
                   <h3 className="text-2xl font-bold text-white">Join the Waitlist</h3>
@@ -372,7 +377,7 @@ export default function Home() {
       {/* ================================================================
           FOOTER — minimal, anchored
           ================================================================ */}
-      <footer className="border-t border-white/5 py-12 md:py-16 text-center text-zinc-600 text-sm font-medium">
+      <footer className="border-t border-white/[0.08] py-12 md:py-16 text-center text-zinc-600 text-sm font-medium">
         <div className="page-container">
           &copy; {new Date().getFullYear()} ClipAura. Designed for high-stakes execution.
         </div>
