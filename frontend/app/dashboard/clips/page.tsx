@@ -60,6 +60,7 @@ export default function ClipsPage() {
   const [error, setError] = useState<string | null>(null);
   const [shareMessage] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState("newest");
+  const [previewVersion, setPreviewVersion] = useState(() => Date.now());
 
   const hasActiveRef = useRef(false);
 
@@ -125,6 +126,13 @@ export default function ClipsPage() {
   }, [clips, query, sortBy, filterJobId]);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const getPreviewUrl = React.useCallback(
+    (clip: ClipWithJob) => {
+      if (!clip.preview_url) return "";
+      return clip.preview_url.startsWith("http") ? clip.preview_url : `${apiUrl}${clip.preview_url}`;
+    },
+    [apiUrl],
+  );
 
   const showEmptyState = !isLoading && clips.length === 0;
   const showNoSearchResults = !isLoading && clips.length > 0 && filteredClips.length === 0;
@@ -137,6 +145,11 @@ export default function ClipsPage() {
     }
   };
 
+  const refreshRenderedPreviews = React.useCallback(async () => {
+    await fetchJobs();
+    setPreviewVersion(Date.now());
+  }, [fetchJobs]);
+
   return (
     <div className="clips-page">
       <EditorModal
@@ -146,7 +159,8 @@ export default function ClipsPage() {
         jobId={activeEditorClip?.jobId || ""}
         clip={activeEditorClip?.clip || null}
         clipIndex={activeEditorClip?.clipIndex ?? 0}
-        onSaveSuccess={fetchJobs}
+        onSaveSuccess={refreshRenderedPreviews}
+        previewVersion={previewVersion}
       />
 
       <ExportModal
@@ -156,6 +170,7 @@ export default function ClipsPage() {
         jobId={activeExportClip?.jobId || ""}
         clip={activeExportClip?.clip || null}
         clipIndex={activeExportClip?.clipIndex ?? 0}
+        previewVersion={previewVersion}
       />
 
       <section className="clips-hero">
@@ -224,7 +239,8 @@ export default function ClipsPage() {
             >
               <div className="preview">
                 <video
-                  src={`${apiUrl}/api/preview/${clip.jobId}/${clip.filename}`}
+                  key={`${clip.jobId}-${clip.filename}-${clip.render_version || 0}-${previewVersion}`}
+                  src={getPreviewUrl(clip)}
                   muted
                   playsInline
                   onMouseOver={(event) => event.currentTarget.play()}

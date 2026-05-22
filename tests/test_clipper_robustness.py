@@ -1,5 +1,5 @@
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 sys.modules.setdefault("mediapipe", MagicMock())
 sys.modules.setdefault("cv2", MagicMock())
@@ -7,19 +7,14 @@ sys.modules.setdefault("cv2", MagicMock())
 from app.core import clipper
 
 
-def test_safe_create_clip_falls_back_and_succeeds(tmp_path, monkeypatch):
+def test_safe_create_clip_succeeds_with_dynamic(tmp_path, monkeypatch):
     output_path = tmp_path / "clip_1.mp4"
-    attempts = []
 
     def fake_create_clip(*args, **kwargs):
-        attempts.append(kwargs)
-        if len(attempts) < 3:
-            raise RuntimeError("render failed")
         output_path.write_bytes(b"fake video")
         return str(output_path)
 
     monkeypatch.setattr(clipper, "create_clip", fake_create_clip)
-    monkeypatch.setattr(clipper, "validate_rendered_video", lambda path: {"duration": 1.0})
 
     result = clipper.safe_create_clip(
         "source.mp4",
@@ -30,27 +25,59 @@ def test_safe_create_clip_falls_back_and_succeeds(tmp_path, monkeypatch):
     )
 
     assert result["ok"] is True
-    assert result["attempt"] == "static_crop"
-    assert len(attempts) == 3
+    assert result["attempt"] == "dynamic"
 
 
-def test_safe_create_clip_records_error_log_when_all_attempts_fail(tmp_path, monkeypatch):
+def test_safe_create_clip_falls_back_to_static_on_dynamic_failure(tmp_path, monkeypatch):
+    output_path = tmp_path / "clip_1.mp4"
+    call_count = [0]
+
+    def fake_create_clip(*args, **kwargs):
+        call_count[0] += 1
+        raise RuntimeError("dynamic render failed")
+
+    monkeypatch.setattr(clipper, "create_clip", fake_create_clip)
+    monkeypatch.setattr(clipper, "get_video_info", lambda path: (1920, 1080, 30.0))
+
+    with patch("subprocess.run") as mock_run:
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
+
+        result = clipper.safe_create_clip(
+            "source.mp4",
+            {"start_time": 0, "end_time": 10, "title": "Test"},
+            [],
+            str(output_path),
+            0,
+        )
+
+        assert result["ok"] is True
+        assert result["attempt"] == "static_fallback"
+        assert call_count[0] == 1
+
+
+def test_safe_create_clip_fails_when_both_dynamic_and_static_fail(tmp_path, monkeypatch):
     output_path = tmp_path / "clip_1.mp4"
 
     def fake_create_clip(*args, **kwargs):
-        raise RuntimeError(f"failed {kwargs['render_mode']}")
+        raise RuntimeError("dynamic render failed")
 
     monkeypatch.setattr(clipper, "create_clip", fake_create_clip)
+    monkeypatch.setattr(clipper, "get_video_info", lambda path: (1920, 1080, 30.0))
 
-    result = clipper.safe_create_clip(
-        "source.mp4",
-        {"start_time": 0, "end_time": 10, "title": "Test"},
-        [],
-        str(output_path),
-        0,
-    )
+    with patch("subprocess.run") as mock_run:
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stderr = "ffmpeg error output"
+        mock_run.return_value = mock_result
 
-    log_path = tmp_path / "logs" / "clip_1_render_errors.log"
-    assert result["ok"] is False
-    assert log_path.exists()
-    assert "letterbox" in log_path.read_text(encoding="utf-8")
+        result = clipper.safe_create_clip(
+            "source.mp4",
+            {"start_time": 0, "end_time": 10, "title": "Test"},
+            [],
+            str(output_path),
+            0,
+        )
+
+        assert result["ok"] is False

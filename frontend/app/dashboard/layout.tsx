@@ -66,6 +66,10 @@ export default function DashboardLayout({
               </Link>
             );
           })}
+          <button className="nav-item logout mobile-logout" onClick={signOut}>
+            <LogOut size={18} />
+            Sign Out
+          </button>
         </nav>
 
         <div className="sidebar-footer">

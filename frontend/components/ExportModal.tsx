@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Download, Copy, Check, Share2, Phone, Sparkles, ExternalLink, Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/lib/supabase";
@@ -11,6 +11,7 @@ export interface Clip {
   virality_score: number;
   duration?: string | number;
   hook_caption?: string;
+  preview_url?: string;
   reason?: string;
   category?: string;
   hashtags?: string[] | string;
@@ -24,18 +25,32 @@ interface ExportModalProps {
   jobId: string;
   clip: Clip | null;
   clipIndex: number;
+  previewVersion?: number;
 }
 
-export default function ExportModal({ isOpen, onClose, jobId, clip, clipIndex }: ExportModalProps) {
+export default function ExportModal({ isOpen, onClose, jobId, clip, clipIndex, previewVersion = 0 }: ExportModalProps) {
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
+  const [qrLoaded, setQrLoaded] = useState(false);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  // Escape key closes modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!clip) return null;
 
-  const previewUrl = `${apiUrl}/api/preview/${jobId}/${clip.filename}`;
+  const previewUrl = clip.preview_url
+    ? (clip.preview_url.startsWith("http") ? clip.preview_url : `${apiUrl}${clip.preview_url}`)
+    : "";
   const downloadUrl = `${apiUrl}/api/download/${jobId}/${clip.filename}`;
   
   // Format hashtags properly
@@ -147,7 +162,8 @@ Generated with ClipAura ✨`;
 
                 <div className="qr-container">
                   <div className="qr-frame">
-                    <img src={qrCodeUrl} alt="Scan QR Code to save on mobile" className="qr-image" />
+                    {!qrLoaded && <div className="qr-placeholder"><Loader2 className="spin" size={24} /></div>}
+                    <img src={qrCodeUrl} alt="QR code to download video on mobile" className="qr-image" onLoad={() => setQrLoaded(true)} onError={() => setQrLoaded(true)} style={{ display: qrLoaded ? 'block' : 'none' }} />
                     <div className="qr-glow" />
                   </div>
                   <div className="qr-instructions">
@@ -273,15 +289,15 @@ Generated with ClipAura ✨`;
               width: 42px;
               height: 42px;
               border-radius: 12px;
-              background: rgba(246, 92, 139, 0.12);
-              border: 1px solid rgba(246, 92, 139, 0.25);
+              background: rgba(124, 58, 237, 0.12);
+              border: 1px solid rgba(124, 58, 237, 0.25);
               display: flex;
               align-items: center;
               justify-content: center;
             }
 
             .text-accent {
-              color: #f65c8b;
+              color: #7c3aed;
             }
 
             .export-header h2 {
@@ -360,6 +376,7 @@ Generated with ClipAura ✨`;
 
             .qr-frame {
               position: relative;
+              position: relative;
               background: #ffffff;
               padding: 12px;
               border-radius: 16px;
@@ -373,11 +390,20 @@ Generated with ClipAura ✨`;
               height: 140px;
             }
 
+            .qr-placeholder {
+              width: 140px;
+              height: 140px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              color: var(--muted);
+            }
+
             .qr-glow {
               position: absolute;
               inset: -2px;
               border-radius: 18px;
-              background: linear-gradient(135deg, #f65c8b, #8b5cf6);
+              background: linear-gradient(135deg, #7c3aed, #7c3aed);
               z-index: -1;
               opacity: 0.25;
               filter: blur(8px);
@@ -428,14 +454,14 @@ Generated with ClipAura ✨`;
               text-decoration: none;
               cursor: pointer;
               border: 0;
-              background: linear-gradient(135deg, #f65c8b, #8b5cf6);
+              background: linear-gradient(135deg, #7c3aed, #7c3aed);
               color: #ffffff;
               transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             }
 
             .download-btn:hover {
               transform: translateY(-1px);
-              box-shadow: 0 8px 24px rgba(246, 92, 139, 0.25);
+              box-shadow: 0 8px 24px rgba(124, 58, 237, 0.25);
             }
 
             .download-btn:disabled {
@@ -497,9 +523,9 @@ Generated with ClipAura ✨`;
             }
 
             .hook-val {
-              border-color: rgba(246, 92, 139, 0.15);
-              background: rgba(246, 92, 139, 0.02);
-              color: #f65c8b;
+              border-color: rgba(124, 58, 237, 0.15);
+              background: rgba(124, 58, 237, 0.02);
+              color: #7c3aed;
               font-weight: 700;
             }
 
@@ -516,8 +542,8 @@ Generated with ClipAura ✨`;
               min-height: 46px;
               border: none;
               border-radius: 12px;
-              background: linear-gradient(135deg, rgba(246, 92, 139, 0.15), rgba(139, 92, 246, 0.15));
-              border: 1px solid rgba(246, 92, 139, 0.25);
+              background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(124, 58, 237, 0.15));
+              border: 1px solid rgba(124, 58, 237, 0.25);
               color: #ffffff;
               font-size: 13px;
               font-weight: 750;
@@ -530,10 +556,10 @@ Generated with ClipAura ✨`;
             }
 
             .copy-package-btn:hover {
-              background: linear-gradient(135deg, rgba(246, 92, 139, 0.22), rgba(139, 92, 246, 0.22));
-              border-color: rgba(246, 92, 139, 0.4);
+              background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(124, 58, 237, 0.22));
+              border-color: rgba(124, 58, 237, 0.4);
               transform: translateY(-1px);
-              box-shadow: 0 4px 20px rgba(246, 92, 139, 0.12);
+              box-shadow: 0 4px 20px rgba(124, 58, 237, 0.12);
             }
 
             .text-amber {

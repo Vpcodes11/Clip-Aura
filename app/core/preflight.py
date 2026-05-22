@@ -2,6 +2,7 @@
 import json
 import shutil
 import subprocess
+from app.config import FFPROBE_TIMEOUT_SECONDS
 
 
 class PreflightError(RuntimeError):
@@ -22,7 +23,7 @@ def probe_media(video_path):
         "-of", "json", video_path,
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=FFPROBE_TIMEOUT_SECONDS)
         data = json.loads(result.stdout or "{}")
     except Exception as exc:
         raise PreflightError(f"Unable to inspect source video: {exc}") from exc

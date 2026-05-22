@@ -18,6 +18,8 @@ export interface Clip {
   duration?: string | number;
   hook_caption?: string;
   words?: Word[];
+  preview_url?: string;
+  render_version?: number;
   start_time: number;
   end_time: number;
 }
@@ -30,6 +32,7 @@ interface EditorModalProps {
   clipIndex: number;
   onSaveSuccess: () => void;
   onExport?: () => void;
+  previewVersion?: number;
 }
 
 function getMockWords(clip: Clip): Word[] {
@@ -52,7 +55,7 @@ function getMockWords(clip: Clip): Word[] {
   return mockWords;
 }
 
-export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, onSaveSuccess, onExport }: EditorModalProps) {
+export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, onSaveSuccess, onExport, previewVersion = 0 }: EditorModalProps) {
   const [words, setWords] = useState<Word[]>(() => {
     if (!clip) return [];
     if (clip.words && clip.words.length > 0) {
@@ -74,6 +77,9 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const previewSrc = clip?.preview_url
+    ? (clip.preview_url.startsWith('http') ? clip.preview_url : `${apiUrl}${clip.preview_url}`)
+    : '';
 
   // Video synchronization effects
   useEffect(() => {
@@ -94,6 +100,16 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
 
     return () => clearInterval(interval);
   }, [isPlaying, words, clip]);
+
+  // Escape key closes modal
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const handlePlayPause = () => {
     if (videoRef.current) {
@@ -142,11 +158,20 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
       });
 
       if (!response.ok) {
-        throw new Error('Failed to update clip parameters');
+        let message = 'Failed to update clip parameters';
+        try {
+          const errorBody = await response.json();
+          message = errorBody.detail || message;
+        } catch {
+          // Keep the generic message when the API does not return JSON.
+        }
+        throw new Error(message);
       }
 
       // Start polling to wait for the job status to become complete
+      let attempts = 0;
       const pollTimer = setInterval(async () => {
+        attempts += 1;
         try {
           const statusRes = await authenticatedFetch(`${apiUrl}/api/status/${jobId}`);
           if (statusRes.ok) {
@@ -161,6 +186,11 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               setIsSaving(false);
               alert('Pipeline failed during caption re-rendering.');
             }
+          }
+          if (attempts >= 90) {
+            clearInterval(pollTimer);
+            setIsSaving(false);
+            alert('Render is taking longer than expected. Refresh this project before trying again.');
           }
         } catch (err) {
           console.error('Polling error:', err);
@@ -223,7 +253,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                 >
                   <video 
                     ref={videoRef}
-                    src={`${apiUrl}/api/preview/${jobId}/${clip.filename}`} 
+                    key={`${clip.filename}-${clip.render_version || 0}-${previewVersion}`}
+                    src={previewSrc}
                     className="preview-video"
                     onClick={handlePlayPause}
                     onEnded={() => setIsPlaying(false)}
@@ -242,13 +273,6 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                     <Sliders size={14} />
                     {showSafeZones ? "Hide Safe Zones" : "Show Safe Zones"}
                   </button>
-
-                  {/* Real-time Subtitle Overlay Simulation */}
-                  {isPlaying && activeWordIdx !== null && words[activeWordIdx] && (
-                    <div className="subtitle-overlay font-mono">
-                      {words[activeWordIdx].word.toUpperCase()}
-                    </div>
-                  )}
 
                   {/* Simulated TikTok Safe Zone Overlay */}
                   {showSafeZones && (
@@ -284,9 +308,6 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
 
                       <div className="tok-details">
                         <div className="tok-username">@clipaura.ai</div>
-                        <div className="tok-caption">
-                          Cinematic AI short cuts with animated captions using ClipAura #editing #ai #shorts
-                        </div>
                         <div className="tok-music">
                           <span className="music-icon">♬</span>
                           <span className="music-scroll">Original Sound - clipaura.ai</span>
@@ -358,8 +379,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                         className="stealth-select"
                       >
                         <option value="typography_motion">Karaoke Pop (Dynamic)</option>
-                        <option value="cursive_caps">Cursive + CAPS</option>
-                        <option value="standard_caption">Standard Block</option>
+                        <option value="hormozi">Hormozi Bold</option>
+                        <option value="minimal_modern">Cinematic Minimal</option>
                       </select>
                     </div>
 
@@ -480,7 +501,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                     <Share2 size={16} /> Export
                   </button>
                 )}
-                <button className="glow-button flex items-center gap-2" onClick={handleSave}>
+                <button className="glow-button flex items-center gap-2" onClick={handleSave} disabled={isSaving}>
                   <Save size={16} /> Save and render
                 </button>
               </div>
@@ -609,39 +630,17 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             }
             .play-button-large {
               width: 56px; height: 56px;
-              background: rgba(139, 92, 246, 0.8);
+              background: rgba(124, 58, 237, 0.8);
               border: none; border-radius: 50%;
               display: flex; align-items: center; justify-content: center;
               cursor: pointer;
               transition: 0.2s ease-in-out;
-              box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+              box-shadow: 0 0 20px rgba(124, 58, 237, 0.4);
             }
             .play-button-large:hover {
               transform: scale(1.05);
               background: var(--accent);
             }
-            .subtitle-overlay {
-              position: absolute;
-              bottom: 40px;
-              left: 5%;
-              right: 5%;
-              text-align: center;
-              background: rgba(0, 0, 0, 0.85);
-              border: 2px solid var(--accent);
-              padding: 8px 16px;
-              border-radius: 8px;
-              font-size: 18px;
-              font-weight: 900;
-              letter-spacing: 0.05em;
-              color: #ffeb3b;
-              text-shadow: 2px 2px 0px #000;
-              animation: bounce 0.1s ease-in-out;
-            }
-            @keyframes bounce {
-              0% { transform: scale(0.95); }
-              100% { transform: scale(1.0); }
-            }
-
             .controls-box {
               padding: 16px;
               border-radius: 12px;
@@ -704,9 +703,9 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               border-color: rgba(255, 255, 255, 0.12);
             }
             .stealth-input-field:focus, .stealth-select:focus {
-              border-color: rgba(139, 92, 246, 0.5);
+              border-color: rgba(124, 58, 237, 0.5);
               background: rgba(255, 255, 255, 0.02);
-              box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+              box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.2);
               transform: translateY(-1px);
             }
 
@@ -752,9 +751,9 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
             }
             .word-card.active {
-              background: rgba(139, 92, 246, 0.06);
-              border-color: rgba(139, 92, 246, 0.6);
-              box-shadow: 0 0 16px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+              background: rgba(124, 58, 237, 0.06);
+              border-color: rgba(124, 58, 237, 0.6);
+              box-shadow: 0 0 16px rgba(124, 58, 237, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
             }
             .word-timestamp {
               font-size: 10px;
@@ -780,8 +779,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             }
             .word-input:focus {
               background: rgba(0, 0, 0, 0.4);
-              border-color: rgba(139, 92, 246, 0.5);
-              box-shadow: 0 0 8px rgba(139, 92, 246, 0.15);
+              border-color: rgba(124, 58, 237, 0.5);
+              box-shadow: 0 0 8px rgba(124, 58, 237, 0.15);
             }
             .transcript-footer {
               padding: 16px 20px;
@@ -839,12 +838,12 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             .safe-zone-toggle:hover {
               background: rgba(10, 13, 22, 0.85);
               color: #ffffff;
-              border-color: rgba(246, 92, 139, 0.3);
+              border-color: rgba(124, 58, 237, 0.3);
             }
             .safe-zone-toggle.active {
-              background: rgba(246, 92, 139, 0.15);
-              border-color: rgba(246, 92, 139, 0.4);
-              color: #f65c8b;
+              background: rgba(124, 58, 237, 0.15);
+              border-color: rgba(124, 58, 237, 0.4);
+              color: #7c3aed;
             }
 
             .tiktok-safe-overlay {
@@ -902,7 +901,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               width: 100%;
               height: 100%;
               border-radius: 50%;
-              background: #f65c8b;
+              background: #7c3aed;
               border: 1px solid #ffffff;
             }
             .avatar-plus {
@@ -1001,11 +1000,11 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               transition: background 0.1s ease, transform 0.1s ease;
             }
             .waveform-bar.active {
-              background: linear-gradient(to top, #8b5cf6, #f65c8b);
+              background: linear-gradient(to top, #7c3aed, #7c3aed);
             }
             .waveform-bar.active.spoken {
-              background: linear-gradient(to top, #f65c8b, #ff7b9f);
-              box-shadow: 0 0 8px rgba(246, 92, 139, 0.4);
+              background: linear-gradient(to top, #7c3aed, #ff7b9f);
+              box-shadow: 0 0 8px rgba(124, 58, 237, 0.4);
             }
             .waveform-visualizer:hover .waveform-bar {
               transform: scaleY(1.05);
@@ -1019,12 +1018,12 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               padding: 4px 0;
             }
             .word-card.editing {
-              border-color: rgba(246, 92, 139, 0.5);
+              border-color: rgba(124, 58, 237, 0.5);
               background: rgba(0, 0, 0, 0.4);
             }
             .word-input-edit {
-              background: rgba(246, 92, 139, 0.08);
-              border: 1px solid rgba(246, 92, 139, 0.3);
+              background: rgba(124, 58, 237, 0.08);
+              border: 1px solid rgba(124, 58, 237, 0.3);
               border-radius: 6px;
               color: #ffffff;
               font-size: 14px;
@@ -1036,8 +1035,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               transition: all 0.2s ease;
             }
             .word-input-edit:focus {
-              box-shadow: 0 0 8px rgba(246, 92, 139, 0.3);
-              border-color: #f65c8b;
+              box-shadow: 0 0 8px rgba(124, 58, 237, 0.3);
+              border-color: #7c3aed;
             }
 
             .export-trigger-btn {
@@ -1053,8 +1052,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               transition: all 0.2s ease;
             }
             .export-trigger-btn:hover {
-              background: rgba(246, 92, 139, 0.1);
-              border-color: rgba(246, 92, 139, 0.3);
+              background: rgba(124, 58, 237, 0.1);
+              border-color: rgba(124, 58, 237, 0.3);
               color: #ffffff;
             }
           `}</style>
