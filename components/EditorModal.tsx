@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Play, Save, RotateCcw, Video, Type, Sliders, Share2, Pencil, Ellipsis } from 'lucide-react';
+import { X, Play, Save, RotateCcw, Video, Type, Sliders, Share2, Pencil, Ellipsis, Sparkles, Monitor } from 'lucide-react';
 import { authenticatedFetch } from '@/lib/supabase';
 
 export interface Word {
@@ -223,13 +223,13 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               <div className="header-title">
                 <h2>{clip.title}</h2>
               </div>
-              <button onClick={onClose} className="close-btn"><X size={20} /></button>
+              <button onClick={onClose} className="close-btn" aria-label="Close editor"><X size={20} /></button>
             </div>
 
             {errorMessage && (
               <div className="error-banner">
                 <span>{errorMessage}</span>
-                <button onClick={() => setErrorMessage(null)} className="error-dismiss"><X size={14} /></button>
+                <button onClick={() => setErrorMessage(null)} className="error-dismiss" aria-label="Dismiss error"><X size={14} /></button>
               </div>
             )}
 
@@ -317,7 +317,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                   {/* Playback Controls */}
                   <div className="viewport-overlay" onClick={handlePlayPause}>
                     {!isPlaying && (
-                      <button className="play-button-large">
+                      <button className="play-button-large" aria-label="Play video">
                         <Play size={24} fill="#fff" />
                       </button>
                     )}
@@ -472,6 +472,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                                   setEditingWordIdx(idx);
                                 }}
                                 title="Edit word"
+                                aria-label="Edit word"
                               >
                                 <Pencil size={11} />
                               </button>

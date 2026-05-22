@@ -195,7 +195,7 @@ export default function UploadModal({ isOpen, onClose, onUploadStarted }: Upload
                 <Sparkles size={18} className="text-accent" />
                 <h2>Generate Shorts</h2>
               </div>
-              <button onClick={onClose} className="close-btn" disabled={isUploading}><X size={20} /></button>
+              <button onClick={onClose} className="close-btn" disabled={isUploading} aria-label="Close upload modal"><X size={20} /></button>
             </div>
 
             <div className="modal-tabs">
