@@ -203,7 +203,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                 <h2>Clip Aura Studio Editor</h2>
                 <span className="badge font-mono">CLIP #{clipIndex + 1}</span>
               </div>
-              <button onClick={onClose} className="close-btn"><X size={20} /></button>
+              <button onClick={onClose} className="close-btn" aria-label="Close modal"><X size={20} /></button>
             </div>
 
             {/* Layout */}
@@ -298,7 +298,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                   {/* Playback Controls */}
                   <div className="viewport-overlay" onClick={handlePlayPause}>
                     {!isPlaying && (
-                      <button className="play-button-large">
+                      <button className="play-button-large" aria-label="Play video">
                         <Play size={24} fill="#fff" />
                       </button>
                     )}
