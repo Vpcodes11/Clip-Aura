@@ -52,6 +52,18 @@ openssl rand -hex 32
 
 Use different values for `REDIS_PASSWORD`, `PREVIEW_SIGNING_SECRET`, and `LEAD_HASH_SALT`.
 
+### Fast Migration Option
+
+On this PC, a local-only file named `.env.new-pc.local` may be created from the current `.env`. It is ignored by Git and must not be committed.
+
+To use it on the new PC:
+
+```powershell
+Copy-Item .env.new-pc.local .env
+```
+
+Move `.env.new-pc.local` only through a private channel such as an encrypted USB drive, a password manager secure note, or an encrypted archive. Do not upload it to GitHub, chat, email, or public cloud storage.
+
 ## 4. Run With Docker
 
 Docker is the most reliable way to reproduce the app on the new PC.
