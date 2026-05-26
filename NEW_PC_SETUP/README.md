@@ -1,5 +1,9 @@
 # New PC Setup Runbook
 
+For the condensed complete checklist, start with:
+
+- `NEW_PC_SETUP/MIGRATION_ONE_PAGE.md`
+
 Use this folder as the handoff checklist after cloning the latest GitHub code on a new machine.
 
 ## 1. Install Required Software
