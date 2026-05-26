@@ -23,7 +23,7 @@ export default function DashboardLayout({
   const { signOut, user, loading } = useAuth();
 
   const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === "true";
-  const usageLimit = isDevMode ? 1000 : 15;
+  const usageLimit = isDevMode ? 240 : 60;
   const userInitial = user?.user_metadata?.full_name?.charAt(0) || user?.email?.charAt(0) || "U";
 
   React.useEffect(() => {

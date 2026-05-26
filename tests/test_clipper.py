@@ -10,7 +10,7 @@ sys.modules['mediapipe.python'] = MagicMock()
 sys.modules['mediapipe.python.solutions'] = MagicMock()
 sys.modules['cv2'] = MagicMock()
 
-from app.core.clipper import format_ass_time
+from app.rendering.clipper import format_ass_time
 
 @pytest.mark.parametrize("seconds, expected", [
     (0, "0:00:00.00"),

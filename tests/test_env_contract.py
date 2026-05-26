@@ -24,12 +24,10 @@ def test_check_env_contract_all_present(tmp_path):
                 "GROQ_API_KEY=gsk_test123",
                 "SUPABASE_URL=https://example.supabase.co",
                 "SUPABASE_ANON_KEY=eyJtest123",
-                "SUPABASE_JWT_SECRET=jwt-secret-123",
-                "STRIPE_SECRET_KEY=sk_test_abc",
-                "STRIPE_WEBHOOK_SECRET=whsec_xyz",
-                "STRIPE_PRO_PRICE_ID=price_abc",
                 "REDIS_PASSWORD=devpass",
                 "DATABASE_URL=postgresql://localhost/test",
+                "PREVIEW_SIGNING_SECRET=preview-secret",
+                "LEAD_HASH_SALT=lead-salt",
             ]
         )
     )
@@ -39,7 +37,7 @@ def test_check_env_contract_all_present(tmp_path):
         text=True,
     )
     assert result.returncode == 0
-    assert "All required keys are present" in result.stdout
+    assert "All required Development keys are present" in result.stdout
     assert "MISSING" not in result.stdout
 
 
@@ -71,12 +69,10 @@ def test_check_env_contract_no_secrets_leaked(tmp_path):
                 "GROQ_API_KEY={}".format(secret_groq),
                 "SUPABASE_URL=https://example.supabase.co",
                 "SUPABASE_ANON_KEY=eyJmyRealAnonKey",
-                "SUPABASE_JWT_SECRET=my-jwt-secret-real",
-                "STRIPE_SECRET_KEY=sk_test_realStripeKey",
-                "STRIPE_WEBHOOK_SECRET=whsec_realWebhook",
-                "STRIPE_PRO_PRICE_ID=price_real",
                 "REDIS_PASSWORD=realRedisPass",
                 "DATABASE_URL=postgresql://user:realpass@host/db",
+                "PREVIEW_SIGNING_SECRET=preview-secret",
+                "LEAD_HASH_SALT=lead-salt",
             ]
         )
     )
@@ -88,8 +84,8 @@ def test_check_env_contract_no_secrets_leaked(tmp_path):
     assert result.returncode == 0
     stdout = result.stdout
     assert secret_groq not in stdout
-    assert "realStripeKey" not in stdout
+    assert "realRazorpayKey" not in stdout
     assert "realRedisPass" not in stdout
     assert "realpass" not in stdout
     assert "myRealAnonKey" not in stdout
-    assert stdout.count("PRESENT") >= 9
+    assert stdout.count("PRESENT") >= 6

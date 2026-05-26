@@ -2,14 +2,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 import os
-from app.config import BASE_DIR
+from app.config import BASE_DIR, is_production_environment
 
 
 def build_database_url(database_url: str | None, environment: str, db_dir):
     if database_url:
         return database_url
 
-    if environment.lower() in {"production", "prod"}:
+    if environment.lower() in {"production", "prod"} or is_production_environment():
         raise RuntimeError("DATABASE_URL must be set in production; SQLite fallback is not allowed.")
 
     db_dir.mkdir(parents=True, exist_ok=True)

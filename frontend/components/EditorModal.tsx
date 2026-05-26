@@ -67,14 +67,16 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
   const [hookCaption, setHookCaption] = useState(() => clip?.hook_caption || clip?.title || '');
   const [captionStyle, setCaptionStyle] = useState('typography_motion');
   const [preset, setPreset] = useState('tiktok');
-  
+
   const [isSaving, setIsSaving] = useState(false);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isMountedRef = useRef(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activeWordIdx, setActiveWordIdx] = useState<number | null>(null);
   const [showSafeZones, setShowSafeZones] = useState(false);
   const [editingWordIdx, setEditingWordIdx] = useState<number | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
   const previewSrc = clip?.preview_url
@@ -84,11 +86,11 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
   // Video synchronization effects
   useEffect(() => {
     if (!clip || !isPlaying) return;
-    
+
     const interval = setInterval(() => {
       if (videoRef.current) {
         const time = videoRef.current.currentTime;
-        
+
         // Find matching word
         const globalTime = clip.start_time + time;
         const matchedIdx = words.findIndex(
@@ -100,6 +102,18 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
 
     return () => clearInterval(interval);
   }, [isPlaying, words, clip]);
+
+  // Cleanup on unmount — prevents state updates after modal closes
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Escape key closes modal
   useEffect(() => {
@@ -141,7 +155,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
   const handleSave = async () => {
     if (!clip) return;
     setIsSaving(true);
-    
+
     try {
       const response = await authenticatedFetch(`${apiUrl}/api/clip/edit`, {
         method: 'POST',
@@ -170,25 +184,33 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
 
       // Start polling to wait for the job status to become complete
       let attempts = 0;
-      const pollTimer = setInterval(async () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      pollTimerRef.current = setInterval(async () => {
         attempts += 1;
+        if (!isMountedRef.current) {
+          if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
+          return;
+        }
         try {
           const statusRes = await authenticatedFetch(`${apiUrl}/api/status/${jobId}`);
           if (statusRes.ok) {
             const statusData = await statusRes.json();
             if (statusData.status === 'complete') {
-              clearInterval(pollTimer);
+              if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
+              if (!isMountedRef.current) return;
               setIsSaving(false);
               onSaveSuccess();
               onClose();
             } else if (statusData.status === 'error') {
-              clearInterval(pollTimer);
+              if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
+              if (!isMountedRef.current) return;
               setIsSaving(false);
               alert('Pipeline failed during caption re-rendering.');
             }
           }
           if (attempts >= 90) {
-            clearInterval(pollTimer);
+            if (pollTimerRef.current) { clearInterval(pollTimerRef.current); pollTimerRef.current = null; }
+            if (!isMountedRef.current) return;
             setIsSaving(false);
             alert('Render is taking longer than expected. Refresh this project before trying again.');
           }
@@ -210,7 +232,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
     <AnimatePresence>
       {isOpen && (
         <div className="editor-overlay" onClick={onClose}>
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.98, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: 15 }}
@@ -238,10 +260,10 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
 
             {/* Layout */}
             <div className="editor-layout">
-              
+
               {/* Left Column: Player & Subtitle Canvas */}
               <div className="player-column">
-                <div 
+                <div
                   className="video-viewport glass"
                   style={{
                     aspectRatio: preset === 'landscape' ? '16/9' : '9/16',
@@ -251,7 +273,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                     transition: 'aspect-ratio 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                   }}
                 >
-                  <video 
+                  <video
                     ref={videoRef}
                     key={`${clip.filename}-${clip.render_version || 0}-${previewVersion}`}
                     src={previewSrc}
@@ -260,9 +282,9 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                     onEnded={() => setIsPlaying(false)}
                     onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
                   />
-                  
+
                   {/* Safe Zone Toggle Button */}
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowSafeZones(!showSafeZones);
@@ -332,7 +354,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                     <span>Audio Waveform Seek Bar</span>
                     <span className="font-mono text-xs">{currentTime.toFixed(1)}s / {(((clip.end_time || 10) - (clip.start_time || 0))).toFixed(1)}s</span>
                   </div>
-                  <div 
+                  <div
                     className="waveform-visualizer"
                     onClick={(e) => {
                       const rect = e.currentTarget.getBoundingClientRect();
@@ -358,7 +380,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                       const barHeight = Math.min(95, baseHeight + randomNoise);
 
                       return (
-                        <div 
+                        <div
                           key={i}
                           className={`waveform-bar ${isActive ? 'active' : ''} ${isSpoken ? 'spoken' : ''}`}
                           style={{ height: `${barHeight}%` }}
@@ -373,8 +395,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                   <div className="control-row">
                     <div className="control-item">
                       <label><Type size={14} /> Caption Style</label>
-                      <select 
-                        value={captionStyle} 
+                      <select
+                        value={captionStyle}
                         onChange={(e) => setCaptionStyle(e.target.value)}
                         className="stealth-select"
                       >
@@ -386,8 +408,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
 
                     <div className="control-item">
                       <label><Video size={14} /> Aspect Ratio</label>
-                      <select 
-                        value={preset} 
+                      <select
+                        value={preset}
                         onChange={(e) => setPreset(e.target.value)}
                         className="stealth-select"
                       >
@@ -400,8 +422,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
 
                   <div className="control-item mt-4">
                     <label><Sliders size={14} /> Hook Caption (Headline Overlay)</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       value={hookCaption}
                       onChange={(e) => setHookCaption(e.target.value)}
                       placeholder="e.g. THE #1 SECRET OF SUCCESS..."
@@ -426,7 +448,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                   ) : (
                     <div className="words-grid">
                       {words.map((word, idx) => (
-                        <div 
+                        <div
                           key={idx}
                           className={`word-card ${activeWordIdx === idx ? 'active' : ''} ${editingWordIdx === idx ? 'editing' : ''}`}
                           onClick={() => handleWordClick(word)}
@@ -440,8 +462,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                             {word.start.toFixed(1)}s
                           </div>
                           {editingWordIdx === idx ? (
-                            <input 
-                              type="text" 
+                            <input
+                              type="text"
                               value={word.word ?? ''}
                               onChange={(e) => handleWordChange(idx, e.target.value)}
                               onClick={(e) => e.stopPropagation()}
@@ -468,9 +490,9 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
                 <div className="transcript-footer">
                   <div className="control-item w-full">
                     <label>Clip Title</label>
-                    <input 
-                      type="text" 
-                      value={title} 
+                    <input
+                      type="text"
+                      value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       className="stealth-input-field"
                     />
@@ -493,8 +515,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               </button>
               <div className="flex gap-4">
                 {onExport && (
-                  <button 
-                    className="export-trigger-btn glass flex items-center gap-2" 
+                  <button
+                    className="export-trigger-btn glass flex items-center gap-2"
                     onClick={onExport}
                     type="button"
                   >
@@ -558,7 +580,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               animation: spin 1s linear infinite;
             }
             @keyframes spin { to { transform: rotate(360deg); } }
-            
+
             .editor-header {
               display: flex;
               justify-content: space-between;
@@ -630,12 +652,12 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             }
             .play-button-large {
               width: 56px; height: 56px;
-              background: rgba(124, 58, 237, 0.8);
+              background: rgba(14, 165, 233, 0.82);
               border: none; border-radius: 50%;
               display: flex; align-items: center; justify-content: center;
               cursor: pointer;
               transition: 0.2s ease-in-out;
-              box-shadow: 0 0 20px rgba(124, 58, 237, 0.4);
+              box-shadow: 0 0 20px rgba(14, 165, 233, 0.28);
             }
             .play-button-large:hover {
               transform: scale(1.05);
@@ -703,9 +725,9 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               border-color: rgba(255, 255, 255, 0.12);
             }
             .stealth-input-field:focus, .stealth-select:focus {
-              border-color: rgba(124, 58, 237, 0.5);
+              border-color: rgba(14, 165, 233, 0.5);
               background: rgba(255, 255, 255, 0.02);
-              box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+              box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.14), inset 0 2px 4px rgba(0, 0, 0, 0.2);
               transform: translateY(-1px);
             }
 
@@ -721,7 +743,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               border-bottom: 1px solid rgba(255,255,255,0.05);
             }
             .transcript-header h3 { font-size: 14px; font-weight: 700; }
-            
+
             .words-scrollable {
               flex: 1;
               overflow-y: auto;
@@ -751,9 +773,9 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
             }
             .word-card.active {
-              background: rgba(124, 58, 237, 0.06);
-              border-color: rgba(124, 58, 237, 0.6);
-              box-shadow: 0 0 16px rgba(124, 58, 237, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+              background: rgba(14, 165, 233, 0.06);
+              border-color: rgba(14, 165, 233, 0.6);
+              box-shadow: 0 0 16px rgba(14, 165, 233, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.1);
             }
             .word-timestamp {
               font-size: 10px;
@@ -779,8 +801,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             }
             .word-input:focus {
               background: rgba(0, 0, 0, 0.4);
-              border-color: rgba(124, 58, 237, 0.5);
-              box-shadow: 0 0 8px rgba(124, 58, 237, 0.15);
+              border-color: rgba(14, 165, 233, 0.5);
+              box-shadow: 0 0 8px rgba(14, 165, 233, 0.14);
             }
             .transcript-footer {
               padding: 16px 20px;
@@ -838,12 +860,12 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
             .safe-zone-toggle:hover {
               background: rgba(10, 13, 22, 0.85);
               color: #ffffff;
-              border-color: rgba(124, 58, 237, 0.3);
+              border-color: rgba(14, 165, 233, 0.3);
             }
             .safe-zone-toggle.active {
-              background: rgba(124, 58, 237, 0.15);
-              border-color: rgba(124, 58, 237, 0.4);
-              color: #7c3aed;
+              background: rgba(14, 165, 233, 0.12);
+              border-color: rgba(14, 165, 233, 0.34);
+              color: var(--accent-2);
             }
 
             .tiktok-safe-overlay {
@@ -901,7 +923,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               width: 100%;
               height: 100%;
               border-radius: 50%;
-              background: #7c3aed;
+              background: var(--accent);
               border: 1px solid #ffffff;
             }
             .avatar-plus {
@@ -942,7 +964,7 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               border: 4px solid #333;
               animation: rotate 4s linear infinite;
             }
-            
+
             .tok-details {
               display: flex;
               flex-direction: column;
@@ -1000,11 +1022,11 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               transition: background 0.1s ease, transform 0.1s ease;
             }
             .waveform-bar.active {
-              background: linear-gradient(to top, #7c3aed, #7c3aed);
+              background: linear-gradient(to top, var(--accent), var(--accent));
             }
             .waveform-bar.active.spoken {
-              background: linear-gradient(to top, #7c3aed, #ff7b9f);
-              box-shadow: 0 0 8px rgba(124, 58, 237, 0.4);
+              background: linear-gradient(to top, var(--accent), var(--accent-2));
+              box-shadow: 0 0 8px rgba(14, 165, 233, 0.28);
             }
             .waveform-visualizer:hover .waveform-bar {
               transform: scaleY(1.05);
@@ -1018,12 +1040,12 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               padding: 4px 0;
             }
             .word-card.editing {
-              border-color: rgba(124, 58, 237, 0.5);
+              border-color: rgba(14, 165, 233, 0.5);
               background: rgba(0, 0, 0, 0.4);
             }
             .word-input-edit {
-              background: rgba(124, 58, 237, 0.08);
-              border: 1px solid rgba(124, 58, 237, 0.3);
+              background: rgba(14, 165, 233, 0.08);
+              border: 1px solid rgba(14, 165, 233, 0.3);
               border-radius: 6px;
               color: #ffffff;
               font-size: 14px;
@@ -1035,8 +1057,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               transition: all 0.2s ease;
             }
             .word-input-edit:focus {
-              box-shadow: 0 0 8px rgba(124, 58, 237, 0.3);
-              border-color: #7c3aed;
+              box-shadow: 0 0 8px rgba(14, 165, 233, 0.2);
+              border-color: var(--accent);
             }
 
             .export-trigger-btn {
@@ -1052,8 +1074,8 @@ export default function EditorModal({ isOpen, onClose, jobId, clip, clipIndex, o
               transition: all 0.2s ease;
             }
             .export-trigger-btn:hover {
-              background: rgba(124, 58, 237, 0.1);
-              border-color: rgba(124, 58, 237, 0.3);
+              background: rgba(14, 165, 233, 0.1);
+              border-color: rgba(14, 165, 233, 0.3);
               color: #ffffff;
             }
           `}</style>

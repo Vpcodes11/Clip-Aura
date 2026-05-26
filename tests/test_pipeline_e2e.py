@@ -1,6 +1,6 @@
 import os
 from app.api.database import SessionLocal
-from app.api.models import Job, User
+from app.models.models import Job, User
 from app.worker.tasks import process_video_job_impl
 
 def run_e2e_test():
@@ -14,7 +14,7 @@ def run_e2e_test():
                 id=user_id,
                 email="dev@clip-aura.local",
                 subscription_tier="pro",
-                total_minutes_limit=100,
+                total_minutes_limit=240,
                 used_minutes=0
             )
             db.add(user)

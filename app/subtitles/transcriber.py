@@ -2,8 +2,12 @@
 import subprocess
 import os
 import json
+import time
+import logging
 from openai import OpenAI
-from app.config import AUDIO_CHUNK_DURATION, FFMPEG_TIMEOUT_SECONDS, FFPROBE_TIMEOUT_SECONDS, WHISPER_MAX_FILE_SIZE
+from app.config import AUDIO_CHUNK_DURATION, AI_API_MAX_RETRIES, AI_API_TIMEOUT_SECONDS, FFMPEG_TIMEOUT_SECONDS, FFPROBE_TIMEOUT_SECONDS, WHISPER_MAX_FILE_SIZE
+
+logger = logging.getLogger(__name__)
 
 # Provider configs
 PROVIDERS = {
@@ -26,7 +30,7 @@ def get_client(api_key, provider='groq'):
     kwargs = {'api_key': api_key}
     if config['base_url']:
         kwargs['base_url'] = config['base_url']
-    return OpenAI(**kwargs), config
+    return OpenAI(timeout=AI_API_TIMEOUT_SECONDS, max_retries=0, **kwargs), config
 
 
 def extract_audio(video_path, audio_path):
@@ -91,7 +95,20 @@ def _transcribe_file(client, config, file_path):
         if config['supports_word_timestamps']:
             kwargs['timestamp_granularities'] = ["word", "segment"]
 
-        response = client.audio.transcriptions.create(**kwargs)
+        response = None
+        for attempt in range(AI_API_MAX_RETRIES + 1):
+            try:
+                response = client.audio.transcriptions.create(**kwargs)
+                break
+            except Exception as exc:
+                if attempt >= AI_API_MAX_RETRIES:
+                    raise
+                delay = min(8, 2 ** attempt)
+                logger.warning("Transcription retry attempt=%s file=%s error=%s", attempt + 1, os.path.basename(file_path), exc)
+                time.sleep(delay)
+
+    if response is None:
+        raise RuntimeError("Transcription API returned no response.")
 
     words = []
     segments = []

@@ -14,9 +14,19 @@ from app.config import (
     PRESETS,
     THUMBNAIL_TIMEOUT_SECONDS,
 )
+from app.core.plans import DEFAULT_PLAN, export_dimensions_for_plan, is_paid_plan
 from app.tracking.face_processor import tracker
 
 logger = logging.getLogger(__name__)
+
+
+def escape_ass_text(text: str) -> str:
+    if not text:
+        return text
+    text = text.replace("\\", "\\\\")
+    text = text.replace("{", "\\{")
+    text = text.replace("}", "\\}")
+    return text
 
 
 SAFE_FONT_FALLBACKS = {
@@ -29,6 +39,28 @@ SAFE_FONT_FALLBACKS = {
     "Inter": ["Arial", "Verdana", "Tahoma"],
 }
 COMMON_FALLBACK_FONTS = ["Arial", "Verdana", "Tahoma", "Segoe UI", "Impact", "Sans"]
+WATERMARK_FILTER = "drawtext=text='Created with Clip Aura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5"
+
+
+def should_watermark(subscription_tier: str | None = None, is_pro: bool = False) -> bool:
+    if subscription_tier is not None:
+        return not is_paid_plan(subscription_tier)
+    return not is_pro
+
+
+def get_render_dimensions(preset: str, subscription_tier: str | None = None) -> tuple[int, int]:
+    preset_config = PRESETS.get(preset, PRESETS['tiktok'])
+    return export_dimensions_for_plan(
+        int(preset_config['width']),
+        int(preset_config['height']),
+        subscription_tier or DEFAULT_PLAN,
+    )
+
+
+def append_watermark_filter(filter_prefix: str, subscription_tier: str | None = None, is_pro: bool = False) -> str:
+    if should_watermark(subscription_tier, is_pro):
+        return f"{filter_prefix},{WATERMARK_FILTER}[out]"
+    return f"{filter_prefix}[out]"
 
 
 @functools.lru_cache(maxsize=64)
@@ -152,7 +184,7 @@ def format_ass_time(seconds):
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 
-def generate_ass_subtitles(words, clip_start, clip_end, output_path, caption_style=None, preset="tiktok", hook_headline=None):
+def generate_ass_subtitles(words, clip_start, clip_end, output_path, caption_style=None, preset="tiktok", hook_headline=None, subscription_tier=None):
     """
     Generate ASS subtitle file with word-by-word karaoke animation.
     Now includes the Viral Hook Headline at the top.
@@ -178,9 +210,7 @@ def generate_ass_subtitles(words, clip_start, clip_end, output_path, caption_sty
         if w['start'] >= clip_start - 0.3 and w['end'] <= clip_end + 0.3
     ]
 
-    preset_config = PRESETS.get(preset, PRESETS['tiktok'])
-    tw = preset_config['width']
-    th = preset_config['height']
+    tw, th = get_render_dimensions(preset, subscription_tier)
 
     # Dynamically calculate margin_v
     if tw < th:
@@ -215,7 +245,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     # 1. Add Hook Headline (Persistent for first 5 seconds)
     if hook_headline:
         headline_end = format_ass_time(5.0)
-        ass_content += f"Dialogue: 0,0:00:00.00,{headline_end},Hook,,0,0,0,,{{\\fad(200,200) \\an8}}{hook_headline.upper()}\n"
+        ass_content += f"Dialogue: 0,0:00:00.00,{headline_end},Hook,,0,0,0,,{{\\fad(200,200) \\an8}}{escape_ass_text(hook_headline.upper())}\n"
 
     # 2. Add Word Captions
     if clip_words:
@@ -279,25 +309,25 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         display_word = raw_word.upper()
                         if _deterministic_emoji_roll(word["word"], 0.25):
                             display_word += " " + _deterministic_emoji_pick(word["word"])
-                        part = f"{{\\fn{default_font}}}{{\\c{style['primary_color']}}}{{\\k{duration_cs}}}{display_word} "
+                        part = f"{{\\fn{default_font}}}{{\\c{style['primary_color']}}}{{\\k{duration_cs}}}{escape_ass_text(display_word)} "
                     else:
                         display_word = raw_word.lower()
-                        part = f"{{\\fn{secondary_font}}}{{\\c{style['highlight_color']}}}{{\\k{duration_cs}}}{display_word} "
+                        part = f"{{\\fn{secondary_font}}}{{\\c{style['highlight_color']}}}{{\\k{duration_cs}}}{escape_ass_text(display_word)} "
                 elif caption_style == "hormozi":
                     display_word = raw_word.upper()
                     if clean_word in POWER_WORDS and _deterministic_emoji_roll(word["word"], 0.35):
                         display_word += " " + _deterministic_emoji_pick(word["word"])
                     color_tag = style['highlight_color'] if (j % 2 == 0) else style['primary_color']
-                    part = f"{{\\c{color_tag}}}{{\\k{duration_cs}}}{display_word} "
+                    part = f"{{\\c{color_tag}}}{{\\k{duration_cs}}}{escape_ass_text(display_word)} "
                 elif caption_style == "minimal_modern":
                     display_word = raw_word.capitalize()
                     color_tag = style['highlight_color'] if j == emphasis_index else style['primary_color']
-                    part = f"{{\\c{color_tag}}}{{\\k{duration_cs}}}{display_word} "
+                    part = f"{{\\c{color_tag}}}{{\\k{duration_cs}}}{escape_ass_text(display_word)} "
                 else:
                     display_word = raw_word.upper()
                     if clean_word in POWER_WORDS and _deterministic_emoji_roll(word["word"], 0.3):
                         display_word += " " + _deterministic_emoji_pick(word["word"])
-                    part = f"{{\\k{duration_cs}}}{display_word} "
+                    part = f"{{\\k{duration_cs}}}{escape_ass_text(display_word)} "
 
                 karaoke_parts.append(part)
 
@@ -318,7 +348,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 
 def create_clip(video_path, clip_info, words, output_path, clip_index,
-                progress_callback=None, caption_style=None, preset="tiktok", is_pro=False):
+                progress_callback=None, caption_style=None, preset="tiktok", is_pro=False, subscription_tier=None):
     """
     Create a single clip with Dynamic Face Tracking and Viral Hook Headlines.
     """
@@ -326,9 +356,7 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
     end = clip_info['end_time']
     duration = end - start
 
-    preset_config = PRESETS.get(preset, PRESETS['tiktok'])
-    tw = preset_config['width']
-    th = preset_config['height']
+    tw, th = get_render_dimensions(preset, subscription_tier)
 
     if progress_callback:
         progress_callback(f"Analyzing AI face tracking for clip {clip_index+1}...", 72 + clip_index * 2)
@@ -343,7 +371,7 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
     work_dir = os.path.dirname(output_path)
     ass_path = os.path.join(work_dir, f"subs_{clip_index}.ass")
     hook_headline = clip_info.get('hook_caption', clip_info['title'])
-    generate_ass_subtitles(words, start, end, ass_path, caption_style, preset, hook_headline)
+    generate_ass_subtitles(words, start, end, ass_path, caption_style, preset, hook_headline, subscription_tier)
 
     ass_escaped = ass_path.replace('\\', '/').replace(':', '\\:')
     src_w, src_h, _ = get_video_info(video_path)
@@ -363,7 +391,7 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
         filter_complex = (
             f"[0:v]crop={cw}:{ch}:{median_x}:0:sendcmd=f='{sendcmd_escaped}',"
             f"scale={tw}:{th}[vid];"
-            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Clip Aura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
+            + append_watermark_filter(f"[vid]ass='{ass_escaped}'", subscription_tier, is_pro)
         )
     elif preset in ("tiktok", "youtube_shorts") and src_w > src_h:
         # Standard Landscape-on-Blur if tracking fails
@@ -372,14 +400,14 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
             f"crop={tw}:{th},boxblur=25:5[bg];"
             f"[0:v]scale={tw}:-2[fg];"
             f"[bg][fg]overlay=(W-w)/2:(H-h)/2[vid];"
-            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Clip Aura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
+            + append_watermark_filter(f"[vid]ass='{ass_escaped}'", subscription_tier, is_pro)
         )
     else:
         # Standard fit
         filter_complex = (
             f"[0:v]scale={tw}:{th}:force_original_aspect_ratio=decrease,"
             f"pad={tw}:{th}:(ow-iw)/2:(oh-ih)/2:black[vid];"
-            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Clip Aura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
+            + append_watermark_filter(f"[vid]ass='{ass_escaped}'", subscription_tier, is_pro)
         )
 
     cmd = [
@@ -400,7 +428,10 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
         output_path
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT_SECONDS)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"FFmpeg render timed out after {FFMPEG_TIMEOUT_SECONDS}s") from exc
     if result.returncode != 0:
         raise RuntimeError(f"FFmpeg failed: {result.stderr[-500:]}")
 
@@ -408,7 +439,7 @@ def create_clip(video_path, clip_info, words, output_path, clip_index,
 
 
 def safe_create_clip(video_path, clip_info, words, output_path, clip_index,
-                     progress_callback=None, caption_style=None, preset="tiktok", is_pro=False):
+                     progress_callback=None, caption_style=None, preset="tiktok", is_pro=False, subscription_tier=None):
     """
     Fault-tolerant wrapper around create_clip.
     Falls back to a static center crop if dynamic sendcmd rendering fails.
@@ -428,6 +459,7 @@ def safe_create_clip(video_path, clip_info, words, output_path, clip_index,
             caption_style=caption_style,
             preset=preset,
             is_pro=is_pro,
+            subscription_tier=subscription_tier,
         )
         return {"ok": True, "attempt": "dynamic"}
     except Exception as exc:
@@ -446,8 +478,7 @@ def safe_create_clip(video_path, clip_info, words, output_path, clip_index,
         end = clip_info['end_time']
         duration = end - start
 
-        pc = PRESETS.get(preset, PRESETS['tiktok'])
-        tw, th = pc['width'], pc['height']
+        tw, th = get_render_dimensions(preset, subscription_tier)
 
         work_dir = os.path.dirname(output_path)
         ass_path = os.path.join(work_dir, f"subs_{clip_index}.ass")
@@ -455,7 +486,7 @@ def safe_create_clip(video_path, clip_info, words, output_path, clip_index,
         # Reuse existing ASS file if present, otherwise regenerate
         if not os.path.exists(ass_path):
             hook_headline = clip_info.get('hook_caption', clip_info['title'])
-            generate_ass_subtitles(words, start, end, ass_path, caption_style, preset, hook_headline)
+            generate_ass_subtitles(words, start, end, ass_path, caption_style, preset, hook_headline, subscription_tier)
         ass_escaped = ass_path.replace('\\', '/').replace(':', '\\:')
 
         src_w, src_h, _ = get_video_info(video_path)
@@ -464,7 +495,7 @@ def safe_create_clip(video_path, clip_info, words, output_path, clip_index,
 
         filter_complex = (
             f"[0:v]crop={crop_w}:{src_h}:{center_x}:0,scale={tw}:{th}[vid];"
-            f"[vid]ass='{ass_escaped}'" + (f"[out]" if is_pro else f",drawtext=text='Created with Clip Aura':x=W-tw-20:y=H-th-20:fontsize=28:fontcolor=white@0.8:box=1:boxcolor=black@0.4:boxborderw=5[out]")
+            + append_watermark_filter(f"[vid]ass='{ass_escaped}'", subscription_tier, is_pro)
         )
 
         cmd = [

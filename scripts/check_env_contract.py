@@ -2,7 +2,7 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -10,24 +10,22 @@ REQUIRED_PRODUCTION_KEYS = [
     "GROQ_API_KEY",
     "SUPABASE_URL",
     "SUPABASE_ANON_KEY",
-    "SUPABASE_JWT_SECRET",
-    "STRIPE_SECRET_KEY",
-    "STRIPE_WEBHOOK_SECRET",
-    "STRIPE_PRO_PRICE_ID",
+    "RAZORPAY_KEY_ID",
+    "RAZORPAY_WEBHOOK_SECRET",
     "REDIS_PASSWORD",
     "DATABASE_URL",
+    "PREVIEW_SIGNING_SECRET",
+    "LEAD_HASH_SALT",
 ]
 
 REQUIRED_DEVELOPMENT_KEYS = [
     "GROQ_API_KEY",
     "SUPABASE_URL",
     "SUPABASE_ANON_KEY",
-    "SUPABASE_JWT_SECRET",
-    "STRIPE_SECRET_KEY",
-    "STRIPE_WEBHOOK_SECRET",
-    "STRIPE_PRO_PRICE_ID",
     "REDIS_PASSWORD",
     "DATABASE_URL",
+    "PREVIEW_SIGNING_SECRET",
+    "LEAD_HASH_SALT",
 ]
 
 OPTIONAL_KEYS = [
@@ -87,21 +85,29 @@ def main():
         print("Copy .env.example to .env and fill in required values.")
         sys.exit(1)
 
-    load_dotenv(env_file)
-    all_keys = list(set(REQUIRED_PRODUCTION_KEYS + REQUIRED_DEVELOPMENT_KEYS + OPTIONAL_KEYS))
-    sources = {k: os.getenv(k) for k in all_keys}
+    file_values = dotenv_values(env_file)
+    environment = (file_values.get("ENVIRONMENT") or "").lower()
+    
+    # Select the correct keyset based on environment
+    if environment == "production":
+        required_keys = REQUIRED_PRODUCTION_KEYS
+        label = "Production"
+    else:
+        required_keys = REQUIRED_DEVELOPMENT_KEYS
+        label = "Development"
+
+    sources = file_values
 
     print("=== ClipAura Environment Contract Check ===")
     print("File: {}".format(env_file))
+    print("Target: {}".format(label))
     print()
 
-    production_present, production_missing = check_keys(
-        REQUIRED_PRODUCTION_KEYS, sources
-    )
+    present_keys, missing_keys = check_keys(required_keys, sources)
 
-    print("--- Required (all targets) ---")
-    for key in sorted(REQUIRED_PRODUCTION_KEYS):
-        status = "PRESENT" if key in production_present else "MISSING"
+    print("--- Required ({}) ---".format(label))
+    for key in sorted(required_keys):
+        status = "PRESENT" if key in present_keys else "MISSING"
         marker = "  [OK]" if status == "PRESENT" else "[MISS]"
         print("{} {} {}".format(marker, key, status))
 
@@ -115,26 +121,28 @@ def main():
             print("  [  ] {} (not set)".format(key))
 
     print()
-    print("--- STATIC (compose-enforced) ---")
-    print("  [OK] DEV_MODE=false (compose force-override)")
-    print("  [OK] ENVIRONMENT=production (compose default)")
+    print("--- STATIC ---")
+    print("  [OK] DEV_MODE=false (should not be true in prod)")
 
     print()
     print("--- Results ---")
-    total_required = len(REQUIRED_PRODUCTION_KEYS)
-    print("Keys present: {}/{}".format(len(production_present), total_required))
-    print("Keys missing: {}/{}".format(len(production_missing), total_required))
+    total_required = len(required_keys)
+    print("Keys present: {}/{}".format(len(present_keys), total_required))
+    print("Keys missing: {}/{}".format(len(missing_keys), total_required))
     print()
 
-    if production_missing:
+    if missing_keys:
         print("MISSING REQUIRED KEYS:")
-        for key in production_missing:
+        for key in missing_keys:
             print("  - {}".format(key))
         print()
-        print("Set these values in .env before starting production containers.")
+        if environment == "production":
+            print("Set these values in your deployment platform (Railway/Vercel).")
+        else:
+            print("Set these values in .env before starting development containers.")
         sys.exit(1)
     else:
-        print("All required keys are present. Ready for Docker compose.")
+        print("All required {} keys are present.".format(label))
         sys.exit(0)
 
 

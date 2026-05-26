@@ -33,7 +33,7 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
-        const { data, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -43,15 +43,15 @@ export default function LoginPage() {
         if (error) throw error;
         setSuccessMsg("Verification link sent! Check your inbox.");
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
         router.push("/dashboard");
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || "An authentication error occurred.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "An authentication error occurred.");
     } finally {
       setLoading(false);
     }
@@ -68,8 +68,8 @@ export default function LoginPage() {
         },
       });
       if (error) throw error;
-    } catch (err: any) {
-      setErrorMsg(err.message || "Google login failed.");
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : "Google login failed.");
       setLoading(false);
     }
   };
@@ -90,8 +90,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-4 pt-20">
-      <div className="glass max-w-md w-full p-8 flex flex-col gap-6 relative overflow-hidden">
+    <div className="flex min-h-[100dvh] items-center justify-center px-4 pb-10 pt-28">
+      <div className="glass max-w-md w-full p-6 md:p-8 flex flex-col gap-6 relative overflow-hidden">
         {/* Glow effect */}
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-accent/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-accent-2/10 rounded-full blur-3xl pointer-events-none" />

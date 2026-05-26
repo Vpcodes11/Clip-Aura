@@ -9,7 +9,7 @@ from celery.exceptions import SoftTimeLimitExceeded
 from app.workers.celery_app import celery_app
 from app.api.database import SessionLocal, engine, Base
 from app.models.models import Job, User
-from app.api.schema_compat import ensure_job_columns
+from app.api.schema_compat import ensure_job_columns, ensure_user_columns
 from app.config import CAPTION_STYLES, GROQ_API_KEY, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, OUTPUT_DIR, STORAGE_MODE, PEXELS_API_KEY
 from app.subtitles.transcriber import transcribe
 from app.core.analyzer import analyze_transcript
@@ -19,23 +19,28 @@ from app.core.storage import storage
 from app.core.cut_aligner import align_clip_boundaries
 from app.core.broll import apply_broll
 from app.core.preflight import preflight_source
+from app.core.plans import is_paid_plan
+from app.services.credits import record_usage
+from app.core.circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
 
 # Ensure tables exist for the worker
 Base.metadata.create_all(bind=engine)
 ensure_job_columns(engine)
+ensure_user_columns(engine)
 
 # Initialize Redis for progress broadcasting
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 redis_client = redis.from_url(REDIS_URL)
+circuit_breaker = CircuitBreaker(redis_client)
 
 def publish_message(channel, data):
     """Publish message to Redis, ignoring errors if Redis is not running."""
     try:
         redis_client.publish(channel, json.dumps(data))
     except Exception as e:
-        print(f"[Warning] Failed to publish message to Redis: {e}")
+        logger.warning("Failed to publish message to Redis channel=%s error=%s", channel, e)
 
 
 def make_progress_cb(job_id):
@@ -62,6 +67,10 @@ STAGE_ALIGNED = "aligned"
 STAGE_RENDERING = "clips_rendering"
 STAGE_RENDERED = "clips_rendered"
 STAGE_COMPLETE = "complete"
+
+class AIServiceError(Exception):
+    """Raised when an AI provider API call fails after exhausting retries."""
+    pass
 
 def broadcast_progress(job_id, message, progress):
     """Broadcast progress update via Redis Pub/Sub"""
@@ -127,13 +136,31 @@ def handle_job_error(db, job_id, stage, exc, tb):
     })
 
 
+def _wrap_ai_call(provider, call_fn, progress_cb, stage_label):
+    """Wrap an AI call with circuit breaker fallback and structured error handling."""
+    fallback = circuit_breaker.should_fallback(provider, "openai")
+    effective_provider = fallback or provider
+
+    try:
+        result = call_fn(effective_provider)
+        circuit_breaker.record_success(provider)
+        if fallback:
+            logger.info("AI fallback succeeded for stage=%s provider=%s fallback=%s", stage_label, provider, effective_provider)
+            if progress_cb:
+                progress_cb(f"Switched to {effective_provider} for {stage_label}...", None)
+        return result
+    except Exception as e:
+        circuit_breaker.record_failure(provider)
+        raise AIServiceError(f"{stage_label} failed for provider={effective_provider}: {e}") from e
+
+
 def get_job_or_none(db, job_id):
     return db.query(Job).filter(Job.id == job_id).first()
 
 @celery_app.task(
     name="tasks.process_video_job",
     bind=True,
-    autoretry_for=(redis.RedisError,),
+    autoretry_for=(redis.RedisError, TimeoutError, ConnectionError, OSError, AIServiceError),
     retry_backoff=True,
     retry_jitter=True,
     retry_kwargs={"max_retries": 3},
@@ -162,9 +189,9 @@ def process_video_job_impl(job_id):
             raise RuntimeError(f"Invalid caption style stored in job metadata: {caption_style}")
         preset = job.preset or 'tiktok'
 
-        # Check if user is Pro
+        # Paid tiers export without the trial watermark.
         user = db.query(User).filter(User.id == job.user_id).first()
-        is_pro = user.subscription_tier == "pro" if user else False
+        is_pro = is_paid_plan(user.subscription_tier) if user else False
 
         progress_cb = make_progress_cb(job_id)
 
@@ -192,7 +219,12 @@ def process_video_job_impl(job_id):
                 'words': transcript_data.get('words', []),
             }
         else:
-            transcript = transcribe(video_path, GROQ_API_KEY, progress_cb, provider)
+            transcript = _wrap_ai_call(
+                provider,
+                lambda p: transcribe(video_path, GROQ_API_KEY, progress_cb, p),
+                progress_cb,
+                "transcription"
+            )
             duration = media_info["duration"] if media_info else get_video_info(video_path)[2]
             transcript_data = {
                 'segments': transcript['segments'],
@@ -215,7 +247,12 @@ def process_video_job_impl(job_id):
         ):
             clips_info = job.clip_candidates
         else:
-            clips_info = analyze_transcript(transcript, GROQ_API_KEY, progress_cb, provider)
+            clips_info = _wrap_ai_call(
+                provider,
+                lambda p: analyze_transcript(transcript, GROQ_API_KEY, progress_cb, p),
+                progress_cb,
+                "analysis"
+            )
             set_job_state(db, job, stage=STAGE_ANALYZED, progress=70,
                           message=f"Found {len(clips_info)} candidate clips.",
                           clip_candidates=clips_info)
@@ -248,7 +285,7 @@ def process_video_job_impl(job_id):
                     safe_create_clip,
                     video_path, clip_info, transcript['words'],
                     output_path, i, None,
-                    caption_style, preset, is_pro
+                    caption_style, preset, is_pro, user.subscription_tier if user else None
                 )
                 futures[future] = (i, clip_info)
 
@@ -330,9 +367,17 @@ def process_video_job_impl(job_id):
         set_job_state(db, job, stage=STAGE_RENDERED, progress=98,
                       message=f"Rendered {len(clip_results)} clip(s).", clips=clip_results)
 
-        # user is already loaded at the start of this function
+        # Charge source minutes exactly once per job, after at least one clip succeeds.
+        # Acquire FOR UPDATE lock on the job row first to prevent race conditions
+        # between concurrent workers charging the same job.
         if user:
-            user.used_minutes += minutes_used
+            job = db.query(Job).filter(Job.id == job_id).with_for_update().one()
+            if int(job.usage_minutes_charged or 0) <= 0:
+                user = db.query(User).filter(User.id == user.id).with_for_update().one()
+                record_usage(db, user, minutes_used, job_id=job_id, reason="completed_render")
+                job.usage_minutes_charged = minutes_used
+            else:
+                logger.info("Skipping duplicate usage charge for job_id=%s charged_minutes=%s", job_id, job.usage_minutes_charged)
 
         suffix = "" if not render_failures else f" {len(render_failures)} clip(s) failed and were skipped."
         set_job_state(db, job, stage=STAGE_COMPLETE, status='complete', progress=100,
@@ -356,7 +401,7 @@ def process_video_job_impl(job_id):
 @celery_app.task(
     name="tasks.download_and_process_job",
     bind=True,
-    autoretry_for=(redis.RedisError,),
+    autoretry_for=(redis.RedisError, TimeoutError, ConnectionError, OSError, AIServiceError),
     retry_backoff=True,
     retry_jitter=True,
     retry_kwargs={"max_retries": 3},
@@ -372,7 +417,7 @@ def download_and_process_job(self, job_id, url, job_dir):
         dl_progress = make_progress_cb(job_id)
 
         video_path = download_video(url, job_dir, dl_progress)
-        
+
         if STORAGE_MODE == "cloud":
             dl_progress("Uploading original to cloud...", 10)
             filename = os.path.basename(video_path)
@@ -381,7 +426,7 @@ def download_and_process_job(self, job_id, url, job_dir):
         set_job_state(db, job, stage='downloaded', status='queued',
                       message='Download complete, queuing processing...',
                       video_path=video_path)
-        
+
         process_video_job_impl(job_id)
 
     except Exception as e:

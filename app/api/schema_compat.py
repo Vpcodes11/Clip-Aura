@@ -6,10 +6,25 @@ JOB_COLUMNS = {
     "clip_candidates": "JSON",
     "errors": "JSON",
     "stage": "VARCHAR",
+    "usage_minutes_charged": "INTEGER DEFAULT 0",
 }
 
 USER_COLUMNS = {
     "is_beta_user": "BOOLEAN DEFAULT 0 NOT NULL",
+    "rollover_credits": "INTEGER DEFAULT 0",
+    "razorpay_customer_id": "VARCHAR",
+    "razorpay_subscription_id": "VARCHAR",
+    "subscription_status": "VARCHAR DEFAULT 'trialing'",
+    "last_usage_reset_at": "DATETIME",
+    "role": "VARCHAR DEFAULT 'user' NOT NULL",
+    "subscription_plan": "VARCHAR DEFAULT 'free' NOT NULL",
+    "credits_remaining": "INTEGER DEFAULT 0 NOT NULL",
+    "monthly_credit_limit": "INTEGER DEFAULT 0 NOT NULL",
+    "feature_flags": "JSON",
+    "is_internal_account": "BOOLEAN DEFAULT 0 NOT NULL",
+    "created_by_admin": "VARCHAR",
+    "last_role_change_at": "DATETIME",
+    "role_changed_by": "VARCHAR",
 }
 
 

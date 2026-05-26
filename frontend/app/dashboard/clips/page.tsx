@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef, useState } from "react";
+import React, { Suspense, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -50,6 +50,14 @@ function ClipSkeletonGrid() {
 }
 
 export default function ClipsPage() {
+  return (
+    <Suspense fallback={<ClipSkeletonGrid />}>
+      <ClipsPageContent />
+    </Suspense>
+  );
+}
+
+function ClipsPageContent() {
   const searchParams = useSearchParams();
   const filterJobId = searchParams.get("job");
   const [jobs, setJobs] = useState<Job[]>([]);

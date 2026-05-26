@@ -2,6 +2,7 @@
 import asyncio
 import hashlib
 import hmac
+import logging
 import os
 import uuid
 import shutil
@@ -15,7 +16,7 @@ import redis.asyncio as redis
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Depends, HTTPException, BackgroundTasks, Header
+from fastapi import FastAPI, UploadFile, File, Form, WebSocket, WebSocketDisconnect, Depends, HTTPException, BackgroundTasks, Header, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,14 +24,28 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.config import UPLOAD_DIR, OUTPUT_DIR, BASE_DIR, PRESETS, CAPTION_STYLES, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, STORAGE_MODE, DEV_MODE, S3_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MAX_UPLOAD_SIZE
+from app.config import UPLOAD_DIR, OUTPUT_DIR, BASE_DIR, PRESETS, CAPTION_STYLES, DEFAULT_PROVIDER, DEFAULT_CAPTION_STYLE, STORAGE_MODE, DEV_MODE, MAX_UPLOAD_SIZE
 from app.api.database import engine, Base, get_db, SessionLocal
-from app.models.models import Job, User
+from app.models.models import Job, LeadSubmission, User
 from app.api.schema_compat import ensure_job_columns, ensure_user_columns
 from app.workers.celery_app import celery_app
 from app.core.storage import storage
-from app.api.auth import get_beta_user, get_current_user, get_supabase_client, require_beta_access
-from app.api import payments
+from app.core.plans import PLAN_LABELS, is_paid_plan, is_trial_expired
+from app.services.credits import require_credit_access
+from app.security.rbac import record_audit_event
+from app.api.auth import get_beta_user, get_current_user, get_supabase_client, require_beta_access, require_active_trial
+from app.api.middleware import RequestLoggingMiddleware
+from app.api.rate_limiter import (
+    rate_limit_standard,
+    rate_limit_expensive,
+    rate_limit_strict,
+    rate_limit_ws_connect,
+    rate_limit_api_read,
+    rate_limit_by_ip,
+)
+
+logger = logging.getLogger("clipaura.api")
+from app.api import admin, payments
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -47,6 +62,7 @@ def validate_caption_style(caption_style: Optional[str]) -> str:
 
 
 app = FastAPI(title="Clip Aura — AI Video Clipper")
+app.add_middleware(RequestLoggingMiddleware)
 
 # Security Constraints
 ALLOWED_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.webm'}
@@ -61,11 +77,9 @@ def enforce_upload_size_limit(content_length: Optional[int], bytes_received: int
 
 
 def resolve_job_file(directory: Path, filename: str) -> Path:
-    """Resolve a user-supplied job filename without allowing path traversal."""
     safe_name = os.path.basename(filename)
     if safe_name != filename or not safe_name:
         raise HTTPException(status_code=400, detail="Invalid filename")
-
     filepath = (directory / safe_name).resolve()
     base = directory.resolve()
     if base not in filepath.parents:
@@ -74,16 +88,11 @@ def resolve_job_file(directory: Path, filename: str) -> Path:
 
 
 def get_preview_signing_secret() -> bytes:
-    secret = (
-        os.getenv("PREVIEW_SIGNING_SECRET")
-        or S3_SECRET_KEY
-        or STRIPE_WEBHOOK_SECRET
-    )
-    if not secret:
-        if DEV_MODE:
-            secret = "dev-preview-signing-secret"
-        else:
-            raise HTTPException(status_code=503, detail="Preview signing is not configured.")
+    secret = os.getenv("PREVIEW_SIGNING_SECRET")
+    if not secret or len(secret) < 32:
+        raise RuntimeError("PREVIEW_SIGNING_SECRET must be at least 32 characters. Generate one with: openssl rand -hex 32")
+    if "dev-preview" in secret.lower():
+        raise RuntimeError("PREVIEW_SIGNING_SECRET must not be a placeholder value")
     return secret.encode("utf-8")
 
 
@@ -95,7 +104,6 @@ def sign_preview_url(job_id: str, filename: str, user_id: str, expires_at: Optio
     payload = f"{job_id}:{safe_name}:{user_id}:{exp}".encode("utf-8")
     sig = hmac.new(get_preview_signing_secret(), payload, hashlib.sha256).hexdigest()
     return f"/api/preview/{job_id}/{urllib.parse.quote(safe_name)}?exp={exp}&sig={sig}"
-
 
 def verify_preview_signature(job_id: str, filename: str, user_id: str, exp: Optional[int], sig: Optional[str]) -> None:
     if not exp or not sig:
@@ -199,13 +207,20 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "Accept",
+        "X-Request-ID",
+        "X-Correlation-ID",
+    ],
 )
 
 
 # Include Billing Router
 app.include_router(payments.router)
+app.include_router(admin.router)
 
 # Redis for Pub/Sub updates
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -301,14 +316,56 @@ async def health_ready():
 
 
 @app.get("/api/me")
-async def get_me(user: User = Depends(get_current_user)):
+async def get_me(request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     """Return current user info and usage stats"""
+    await rate_limit_api_read(user.id, "me")
+    record_audit_event(
+        db,
+        "auth.session_checked",
+        actor_user_id=user.id,
+        target_user_id=user.id,
+        request=request,
+    )
+    db.commit()
     return {
         "email": user.email,
+        "role": user.role,
+        "subscription_plan": user.subscription_plan,
         "tier": user.subscription_tier,
-        "minutes_remaining": user.total_minutes_limit - user.used_minutes,
-        "total_limit": user.total_minutes_limit
+        "tier_label": PLAN_LABELS.get((user.subscription_tier or "").lower(), user.subscription_tier),
+        "minutes_remaining": max(0, user.total_minutes_limit - user.used_minutes),
+        "rollover_credits": user.rollover_credits or 0,
+        "total_limit": user.total_minutes_limit,
+        "trial_expired": is_trial_expired(user),
     }
+
+
+class WaitlistRequest(BaseModel):
+    email: str
+    source: Optional[str] = "landing"
+
+
+class ContactRequest(BaseModel):
+    name: str
+    email: str
+    message: str
+
+
+def validate_email_address(email: str) -> str:
+    email = (email or "").strip().lower()
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise HTTPException(status_code=400, detail="Enter a valid email address.")
+    return email
+
+
+def request_ip_hash(request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    ip = forwarded.split(",", 1)[0].strip() or (request.client.host if request.client else "unknown")
+    salt = os.getenv("LEAD_HASH_SALT")
+    if not salt or len(salt) < 16:
+        raise RuntimeError("LEAD_HASH_SALT must be set and at least 16 characters. Generate one with: openssl rand -hex 32")
+    digest = hashlib.sha256(f"{ip}:{salt}".encode("utf-8")).hexdigest()
+    return digest[:32]
 
 
 @app.get("/api/presets")
@@ -318,6 +375,62 @@ async def get_presets():
         "presets": PRESETS,
         "caption_styles": {k: {"name": k.replace("_", " ").title()} for k in CAPTION_STYLES},
     })
+
+
+@app.post("/api/waitlist")
+async def submit_waitlist(req: WaitlistRequest, request: Request, db: Session = Depends(get_db)):
+    email = validate_email_address(req.email)
+    ip_hash = request_ip_hash(request)
+
+    is_allowed = await check_rate_limit(f"lead:{ip_hash}", limit=3, window_seconds=60 * 60)
+    if not is_allowed:
+        raise HTTPException(status_code=429, detail="Too many submissions. Try again later.")
+
+    existing = db.query(LeadSubmission).filter(
+        LeadSubmission.kind == "waitlist",
+        LeadSubmission.email == email,
+    ).first()
+    if not existing:
+        db.add(LeadSubmission(
+            id=str(uuid.uuid4()),
+            kind="waitlist",
+            email=email,
+            source=(req.source or "landing")[:120],
+            ip_hash=ip_hash,
+            user_agent=(request.headers.get("user-agent") or "")[:300],
+        ))
+        db.commit()
+
+    return {"status": "ok", "message": "You're on the waitlist."}
+
+
+@app.post("/api/contact")
+async def submit_contact(req: ContactRequest, request: Request, db: Session = Depends(get_db)):
+    email = validate_email_address(req.email)
+    name = (req.name or "").strip()
+    message = (req.message or "").strip()
+    if len(name) < 2:
+        raise HTTPException(status_code=400, detail="Enter your name.")
+    if len(message) < 10:
+        raise HTTPException(status_code=400, detail="Message must be at least 10 characters.")
+
+    ip_hash = request_ip_hash(request)
+    is_allowed = await check_rate_limit(f"contact:{ip_hash}", limit=3, window_seconds=60 * 60)
+    if not is_allowed:
+        raise HTTPException(status_code=429, detail="Too many submissions. Try again later.")
+
+    db.add(LeadSubmission(
+        id=str(uuid.uuid4()),
+        kind="contact",
+        email=email,
+        name=name[:120],
+        message=message[:4000],
+        source="contact_page",
+        ip_hash=ip_hash,
+        user_agent=(request.headers.get("user-agent") or "")[:300],
+    ))
+    db.commit()
+    return {"status": "ok", "message": "Thanks. We'll get back to you within 24 hours."}
 
 
 async def check_rate_limit(user_id: str, limit: int = 5, window_seconds: int = 60) -> bool:
@@ -340,7 +453,7 @@ async def check_rate_limit(user_id: str, limit: int = 5, window_seconds: int = 6
         return True
     except Exception as e:
         # Fail open in case of Redis failure to maintain user experience
-        print(f"RATE LIMITER WARNING: Redis communication failed: {str(e)}")
+        logger.warning("Rate limiter Redis communication failed", extra={"_structured_fields": {"error": str(e)}})
         return True
 
 
@@ -357,9 +470,8 @@ async def upload_video(
 ):
     """Accept video upload or URL and start processing pipeline (Authenticated)"""
     
-    # Check usage limits
-    if user.used_minutes >= user.total_minutes_limit:
-        raise HTTPException(status_code=403, detail="You have exhausted your limit. Please upgrade to Pro to continue.")
+    # Check usage limits. Internal entitlements may skip enforcement, but usage is still logged in workers.
+    require_credit_access(user)
 
     # Apply Rate Limiter (Max 5 uploads/imports per minute per user)
     is_allowed = await check_rate_limit(user.id, limit=5, window_seconds=60)
@@ -473,31 +585,57 @@ async def upload_video(
 async def get_websocket_user(token: str, db: Session):
     """
     Authenticate a user over WebSockets using the Supabase token.
-    Respects local DEV_MODE settings.
+    DEV_MODE never bypasses backend authentication.
     """
-    if DEV_MODE:
-        user_id = "dev-architect-id"
-        return db.query(User).filter(User.id == user_id).first()
-
     if not token or token in ("null", "undefined", ""):
         return None
 
-    try:
-        res = get_supabase_client().auth.get_user(token)
-        if not res.user:
+    if DEV_MODE and token == "dev-token":
+        user_id = "00000000-0000-0000-0000-000000000000"
+    else:
+        try:
+            res = get_supabase_client().auth.get_user(token)
+            if not res.user:
+                return None
+            user_id = res.user.id
+        except Exception:
             return None
-        user_id = res.user.id
-    except Exception:
-        return None
 
     return db.query(User).filter(User.id == user_id).first()
 
 
 @app.websocket("/ws/{job_id}")
-async def websocket_endpoint(websocket: WebSocket, job_id: str, token: str = None, db: Session = Depends(get_db)):
-    """WebSocket for real-time progress updates via Redis Pub/Sub (Authenticated)"""
-    await websocket.accept()
+async def websocket_endpoint(websocket: WebSocket, job_id: str, db: Session = Depends(get_db)):
+    """WebSocket for real-time progress updates via Redis Pub/Sub (Authenticated)
     
+    Authentication uses the Sec-WebSocket-Protocol header to transport the JWT token.
+    This prevents token exposure in proxy/CDN logs that capture URL query strings.
+    The format is: "clipaura-auth, {token}"
+    """
+    try:
+        await rate_limit_ws_connect(websocket)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return
+
+    # Extract token from Sec-WebSocket-Protocol header
+    protocols = websocket.headers.get("sec-websocket-protocol", "")
+    token = None
+    if protocols:
+        parts = [p.strip() for p in protocols.split(",")]
+        for part in parts:
+            if part and part != "clipaura-auth":
+                token = part
+                break
+
+    if not token:
+        await websocket.accept()
+        await websocket.send_json({"type": "error", "message": "Authentication failed. Missing token in Sec-WebSocket-Protocol header."})
+        await websocket.close(code=1008)
+        return
+
+    await websocket.accept(headers=[("Sec-WebSocket-Protocol", "clipaura-auth")])
+
     # Authenticate WebSocket connection
     user = await get_websocket_user(token, db)
     if not user:
@@ -507,6 +645,7 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str, token: str = Non
 
     try:
         require_beta_access(user)
+        require_active_trial(user)
     except HTTPException as exc:
         await websocket.send_json({"type": "error", "message": exc.detail})
         await websocket.close(code=1008)  # Policy Violation
@@ -561,6 +700,7 @@ async def websocket_endpoint(websocket: WebSocket, job_id: str, token: str = Non
 @app.get("/api/jobs")
 async def get_my_jobs(db: Session = Depends(get_db), user: User = Depends(get_beta_user)):
     """List all jobs for the current user"""
+    await rate_limit_api_read(user.id, "jobs")
     jobs = db.query(Job).filter(Job.user_id == user.id).order_by(Job.created_at.desc()).all()
     return [serialize_job(job) for job in jobs]
 
@@ -568,6 +708,7 @@ async def get_my_jobs(db: Session = Depends(get_db), user: User = Depends(get_be
 @app.get("/api/status/{job_id}")
 async def get_status(job_id: str, db: Session = Depends(get_db), user: User = Depends(get_beta_user)):
     """Polling fallback for progress updates"""
+    await rate_limit_standard(user.id, "status")
     job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -585,6 +726,7 @@ async def get_status(job_id: str, db: Session = Depends(get_db), user: User = De
 @app.get("/api/preview-url/{job_id}/{filename}")
 async def get_preview_url(job_id: str, filename: str, db: Session = Depends(get_db), user: User = Depends(get_beta_user)):
     """Return a short-lived signed preview URL after validating ownership."""
+    await rate_limit_standard(user.id, "preview_url")
     safe_name = os.path.basename(filename)
     if safe_name != filename or not safe_name:
         raise HTTPException(status_code=400, detail="Invalid filename")
@@ -613,6 +755,7 @@ def _cloud_redirect(job_id: str, safe_name: str):
 @app.get("/api/download/{job_id}/{filename}")
 async def download_clip(job_id: str, filename: str, db: Session = Depends(get_db), user: User = Depends(get_beta_user)):
     """Download a generated clip"""
+    await rate_limit_standard(user.id, "download")
     safe_name = os.path.basename(filename)
     if safe_name != filename or not safe_name:
         raise HTTPException(status_code=400, detail="Invalid filename")
@@ -673,16 +816,19 @@ async def preview_clip(job_id: str, filename: str, exp: Optional[int] = None, si
 @app.delete("/api/job/{job_id}")
 async def delete_job(job_id: str, db: Session = Depends(get_db), user: User = Depends(get_beta_user)):
     """Clean up job data"""
+    await rate_limit_standard(user.id, "delete_job")
     job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
-    if job:
-        if STORAGE_MODE == "cloud":
-            if job.clips:
-                for clip in job.clips:
-                    storage.delete_file(f"jobs/{job_id}/{clip['filename']}")
-                    storage.delete_file(f"jobs/{job_id}/{clip['thumbnail']}")
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
 
-        db.delete(job)
-        db.commit()
+    if STORAGE_MODE == "cloud":
+        if job.clips:
+            for clip in job.clips:
+                storage.delete_file(f"jobs/{job_id}/{clip['filename']}")
+                storage.delete_file(f"jobs/{job_id}/{clip['thumbnail']}")
+
+    db.delete(job)
+    db.commit()
 
     # Clean up local files
     for d in [UPLOAD_DIR / job_id, OUTPUT_DIR / job_id]:
@@ -695,6 +841,7 @@ async def delete_job(job_id: str, db: Session = Depends(get_db), user: User = De
 @app.post("/api/job/{job_id}/retry")
 async def retry_job(job_id: str, db: Session = Depends(get_db), user: User = Depends(get_beta_user)):
     """Retry a failed or partially completed job from its latest durable checkpoint."""
+    await rate_limit_expensive(user.id, "retry")
     job = db.query(Job).filter(Job.id == job_id, Job.user_id == user.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -759,7 +906,7 @@ class EditClipRequest(BaseModel):
     preset: Optional[str] = None
 
 async def regenerate_clip_in_background(
-    job_id: str, filename: str, words_list: list, caption_style: str, preset: str, is_pro: bool, title: str, hook_caption: str
+    job_id: str, filename: str, words_list: list, caption_style: str, preset: str, is_pro: bool, title: str, hook_caption: str, subscription_tier: str
 ):
     db = SessionLocal()
     temp_output_path = None
@@ -816,7 +963,8 @@ async def regenerate_clip_in_background(
                 progress_callback=None,
                 caption_style=caption_style,
                 preset=preset,
-                is_pro=is_pro
+                is_pro=is_pro,
+                subscription_tier=subscription_tier,
             )
         )
 
@@ -835,7 +983,7 @@ async def regenerate_clip_in_background(
         # Fetch fresh ref and enforce state-machine guard
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job or job.status != 'processing' or job.stage != 'clip_regenerating':
-            print(f"REGENERATION GUARD: Job {job_id} state changed mid-regeneration (status={job.status if job else 'None'}). Aborting metadata commit.")
+            logger.warning("Regeneration guard tripped", extra={"_structured_fields": {"job_id": job_id, "status": job.status if job else "None"}})
             if temp_output_path and os.path.exists(temp_output_path):
                 os.remove(temp_output_path)
             return
@@ -872,7 +1020,7 @@ async def regenerate_clip_in_background(
         }))
         
     except Exception as e:
-        print("CAPTION REGEN ERROR:", e)
+        logger.error("Caption regeneration failed", exc_info=True)
         if temp_output_path and os.path.exists(temp_output_path):
             try:
                 os.remove(temp_output_path)
@@ -897,7 +1045,7 @@ async def regenerate_clip_in_background(
                 error_job.progress = 100
                 error_db.commit()
         except Exception as db_err:
-            print(f"ERROR HANDLER DB FAILURE for job {job_id}: {db_err}")
+            logger.error("Error handler DB failure", extra={"_structured_fields": {"job_id": job_id, "error": str(db_err)}})
         finally:
             error_db.close()
 
@@ -907,7 +1055,7 @@ async def regenerate_clip_in_background(
                 'message': f"Failed to edit captions: {str(e)[:200]}",
             }))
         except Exception as pub_err:
-            print(f"ERROR HANDLER PUBLISH FAILURE for job {job_id}: {pub_err}")
+            logger.error("Error handler publish failure", extra={"_structured_fields": {"job_id": job_id, "error": str(pub_err)}})
     finally:
         db.close()
 
@@ -922,6 +1070,7 @@ async def edit_clip(
     Regenerates a specific clip's subtitle captions and text overlays.
     Enforces subscription tier privileges and runs asynchronously in the background.
     """
+    await rate_limit_expensive(user.id, "clip_edit")
     job = db.query(Job).filter(Job.id == req.job_id, Job.user_id == user.id).first()
     if not job:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -944,7 +1093,7 @@ async def edit_clip(
     caption_style = req.caption_style or job.caption_style
     caption_style = validate_caption_style(caption_style)
     preset = req.preset or job.preset
-    is_pro = user.subscription_tier == "pro"
+    is_pro = is_paid_plan(user.subscription_tier)
 
     updated = db.query(Job).filter(
         Job.id == req.job_id,
@@ -970,7 +1119,8 @@ async def edit_clip(
         preset,
         is_pro,
         req.title,
-        req.hook_caption
+        req.hook_caption,
+        user.subscription_tier,
     )
     
     return {"status": "processing", "message": "Regenerating captions in the background..."}

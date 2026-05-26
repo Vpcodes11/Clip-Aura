@@ -12,32 +12,6 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
-const isDevMode = typeof window !== 'undefined' && process.env.NEXT_PUBLIC_DEV_MODE === 'true';
-
-function buildDevSession(): { user: User; session: Session } {
-  const devUser: User = {
-    id: 'dev-architect-id',
-    aud: 'authenticated',
-    role: 'authenticated',
-    email: 'dev@clipaura.local',
-    app_metadata: {},
-    user_metadata: { full_name: 'Dev Architect' },
-    created_at: '2026-01-01T00:00:00Z',
-  } as User;
-  const devSession: Session = {
-    provider_token: undefined,
-    provider_refresh_token: undefined,
-    access_token: 'dev-token',
-    refresh_token: 'dev-refresh-token',
-    expires_in: 3600,
-    token_type: 'bearer',
-    user: devUser,
-  };
-  return { user: devUser, session: devSession };
-}
-
-const devSessionData = isDevMode ? buildDevSession() : null;
-
 const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
@@ -51,13 +25,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  const setSessionHint = (isAuthenticated: boolean) => {
+    if (typeof document === "undefined") return;
+    const secureFlag = window.location.protocol === "https:" ? "; Secure" : "";
+    if (isAuthenticated) {
+      document.cookie = `clipaura_session_hint=1; path=/; max-age=86400; SameSite=Lax${secureFlag}`;
+    } else {
+      document.cookie = `clipaura_session_hint=; path=/; max-age=0; SameSite=Lax${secureFlag}`;
+    }
+  };
+
   useEffect(() => {
-    const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
-    
-    if (isDevMode) {
-      const devSession = buildDevSession();
-      setUser(devSession.user);
-      setSession(devSession.session);
+    if (process.env.NEXT_PUBLIC_DEV_MODE === "true") {
+      setUser({ id: "dev-user", email: "dev@clipaura.com", user_metadata: { full_name: "Dev User" } } as any);
+      setSession({ access_token: "dev-token" } as any);
+      setSessionHint(true);
       setLoading(false);
       return;
     }
@@ -65,12 +47,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setSession(session);
+      setSessionHint(Boolean(session));
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       setSession(session);
+      setSessionHint(Boolean(session));
       setLoading(false);
 
       if (event === 'SIGNED_IN') {
@@ -87,6 +71,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setSessionHint(false);
   };
 
   return (

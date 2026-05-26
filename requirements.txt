@@ -11,10 +11,10 @@ opencv-python
 numpy
 sqlalchemy
 celery
-redis
-boto3
-supabase
-stripe
+redis==5.0.3
+sentry-sdk==1.44.1
+razorpay==1.4.1
+supabase==2.4.1
 python-jose[cryptography]
 requests
 psycopg2-binary

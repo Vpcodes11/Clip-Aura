@@ -5,7 +5,9 @@ WORKDIR /app
 
 # Install system dependencies required for FFmpeg and OpenCV
 RUN apt-get update && apt-get install -y \
+    gcc \
     ffmpeg \
+    libpq-dev \
     libsm6 \
     libxext6 \
     libgl1 \
@@ -21,8 +23,15 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --default-timeout=1000 --no-cache-dir -r requirements.txt
 
+# Remove build dependencies to slim the final image
+RUN apt-get remove -y gcc libpq-dev && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+
 # Copy application code
 COPY . .
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash appuser && chown -R appuser:appuser /app
+USER appuser
 
 # Expose the port the app runs on
 EXPOSE 8000

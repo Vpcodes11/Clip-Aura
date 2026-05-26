@@ -5,20 +5,20 @@ import { ArrowLeft, Play } from "@phosphor-icons/react";
 
 export default function DemoPage() {
   return (
-    <main className="min-h-screen bg-black pt-24 pb-32">
+    <main className="min-h-screen bg-black pt-28 pb-24 md:pb-32">
       <div className="page-container max-w-5xl">
-        <div className="mb-12">
+        <div className="section-heading mb-10 md:mb-12">
           <Link href="/" className="inline-flex items-center gap-2 text-zinc-500 hover:text-white transition-colors text-sm font-bold mb-8">
             <ArrowLeft weight="bold" /> Back to Engine
           </Link>
-          <h1 className="text-4xl md:text-5xl font-outfit font-bold text-white mb-4">Output Showcase</h1>
-          <p className="text-zinc-400 text-lg max-w-2xl">Unedited, raw pipeline renders from our production environment. Zero manual adjustments made after FFmpeg processing.</p>
+          <h1 className="section-title-lg text-white mb-4">Output Showcase</h1>
+          <p className="section-copy max-w-2xl">Unedited, raw pipeline renders from our production environment. Zero manual adjustments made after FFmpeg processing.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6">
           
           {/* Demo 1 */}
-          <div className="liquid-glass rounded-2xl p-6 border border-white/5 flex flex-col gap-6">
+          <div className="liquid-glass rounded-[22px] p-5 md:p-6 border-white/[0.07] flex flex-col gap-6">
             <div className="flex items-center justify-between">
                <div>
                  <h3 className="text-xl font-bold text-white font-outfit">Podcast Excerpt</h3>
@@ -42,7 +42,7 @@ export default function DemoPage() {
                 <div className="aspect-[9/16] bg-zinc-900 rounded-lg border border-sky-500/30 shadow-[0_0_20px_rgba(14,165,233,0.1)] flex items-center justify-center relative group cursor-pointer overflow-hidden">
                    <Play size={32} className="text-white/50 group-hover:text-white transition-colors" weight="fill" />
                    <div className="absolute inset-x-0 bottom-8 text-center">
-                     <span className="bg-black/80 px-2 py-1 text-white font-outfit font-black text-xs uppercase shadow-xl tracking-tighter">GENERATED CAPTION</span>
+                     <span className="bg-black/80 px-2 py-1 text-white font-outfit font-black text-xs uppercase shadow-xl">GENERATED CAPTION</span>
                    </div>
                 </div>
               </div>
@@ -50,7 +50,7 @@ export default function DemoPage() {
           </div>
 
           {/* Demo 2 */}
-          <div className="liquid-glass rounded-2xl p-6 border border-white/5 flex flex-col gap-6">
+          <div className="liquid-glass rounded-[22px] p-5 md:p-6 border-white/[0.07] flex flex-col gap-6">
             <div className="flex items-center justify-between">
                <div>
                  <h3 className="text-xl font-bold text-white font-outfit">Gaming Stream</h3>
@@ -74,7 +74,7 @@ export default function DemoPage() {
                 <div className="aspect-[9/16] bg-zinc-900 rounded-lg border border-sky-500/30 shadow-[0_0_20px_rgba(14,165,233,0.1)] flex items-center justify-center relative group cursor-pointer overflow-hidden">
                    <Play size={32} className="text-white/50 group-hover:text-white transition-colors" weight="fill" />
                    <div className="absolute inset-x-0 bottom-16 text-center">
-                     <span className="bg-transparent text-yellow-400 font-outfit font-black text-xl uppercase drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] stroke-black tracking-tighter">WAIT WHAT?!</span>
+                     <span className="bg-transparent text-yellow-400 font-outfit font-black text-xl uppercase drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)] stroke-black">WAIT WHAT?!</span>
                    </div>
                 </div>
               </div>
@@ -83,7 +83,7 @@ export default function DemoPage() {
 
         </div>
 
-        <div className="mt-20 text-center">
+        <div className="mt-14 md:mt-16 text-center">
           <Link href="/#waitlist" className="btn-primary py-4 px-8 text-lg">
             Request Private Beta Access
           </Link>

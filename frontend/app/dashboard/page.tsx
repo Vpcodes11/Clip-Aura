@@ -222,26 +222,26 @@ export default function Dashboard() {
         .clean-dashboard {
           display: flex;
           flex-direction: column;
-          gap: clamp(20px, 3vw, 28px);
+          gap: clamp(28px, 4vw, 40px);
         }
 
         .dashboard-hero {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          gap: 20px;
+          gap: 24px;
           animation: fadeSlide 0.32s ease both;
         }
 
         h1 {
           font-size: clamp(32px, 5vw, 48px);
           line-height: 1;
-          margin-bottom: 8px;
+          margin-bottom: 10px;
         }
 
         .dashboard-hero p {
           color: var(--muted);
-          line-height: 1.5;
+          line-height: 1.6;
           max-width: 42ch;
         }
 
@@ -276,9 +276,9 @@ export default function Dashboard() {
         }
 
         .primary-action {
-          min-height: 46px;
-          border-radius: 12px;
-          padding: 0 18px;
+          min-height: 48px;
+          border-radius: 14px;
+          padding: 0 22px;
           background: #ffffff;
           color: #05060a;
           font-weight: 800;
@@ -287,25 +287,26 @@ export default function Dashboard() {
           cursor: pointer;
           display: inline-flex;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
           flex-shrink: 0;
+          font-size: 15px;
         }
 
         .empty-guide {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
-          gap: 14px;
+          gap: 20px;
         }
 
         .empty-guide-card {
-          min-height: 180px;
+          min-height: 220px;
           border: 1px solid rgba(255, 255, 255, 0.08);
-          border-radius: 18px;
-          padding: 32px 28px;
+          border-radius: 20px;
+          padding: 40px 32px;
           display: flex;
           flex-direction: column;
           align-items: flex-start;
-          gap: 12px;
+          gap: 16px;
           background: rgba(10, 13, 22, 0.62);
           cursor: pointer;
           transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
@@ -324,13 +325,13 @@ export default function Dashboard() {
 
         .empty-guide-card h2 {
           font-family: var(--font-outfit);
-          font-size: 20px;
+          font-size: 22px;
         }
 
         .empty-guide-card p {
           color: var(--muted);
-          font-size: 14px;
-          line-height: 1.5;
+          font-size: 15px;
+          line-height: 1.6;
         }
 
         .project-panel {
@@ -345,7 +346,7 @@ export default function Dashboard() {
         }
 
         .panel-top {
-          padding: 24px;
+          padding: 28px 32px;
           border-bottom: 1px solid rgba(255, 255, 255, 0.08);
           display: flex;
           align-items: center;
@@ -422,10 +423,10 @@ export default function Dashboard() {
         .project-row {
           display: grid;
           grid-template-columns: minmax(220px, 1fr) 220px auto;
-          gap: 16px;
+          gap: 20px;
           align-items: center;
-          min-height: 72px;
-          padding: 16px 24px;
+          min-height: 80px;
+          padding: 20px 32px;
           border-top: 1px solid rgba(255, 255, 255, 0.07);
           transition: background 0.18s ease, transform 0.18s ease;
         }
@@ -442,9 +443,9 @@ export default function Dashboard() {
         }
 
         .status-icon {
-          width: 36px;
-          height: 36px;
-          border-radius: 10px;
+          width: 40px;
+          height: 40px;
+          border-radius: 12px;
           display: grid;
           place-items: center;
           flex: 0 0 auto;
@@ -535,7 +536,7 @@ export default function Dashboard() {
         .progress-bar-fill {
           height: 100%;
           border-radius: inherit;
-          background: linear-gradient(90deg, #06b6d4, #7c3aed);
+          background: linear-gradient(90deg, #06b6d4, #38bdf8);
           transition: width 0.4s ease;
         }
 
@@ -661,8 +662,8 @@ export default function Dashboard() {
         @media (max-width: 860px) {
           .project-row {
             grid-template-columns: 1fr;
-            gap: 12px;
-            padding: 18px;
+            gap: 14px;
+            padding: 22px;
           }
 
           .meta-cell {
@@ -811,22 +812,26 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
 
     const connectWs = async () => {
       try {
-        const isDevMode = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
-        let token = 'dev-token';
-        if (!isDevMode) {
+        const isDev = process.env.NEXT_PUBLIC_DEV_MODE === 'true';
+        let accessToken = '';
+
+        if (isDev) {
+          accessToken = 'dev-token';
+        } else {
           const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            token = session.access_token;
+          if (!session) {
+            return;
           }
+          accessToken = session.access_token;
         }
 
         if (!isMounted) return;
 
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         const wsProtocol = apiUrl.startsWith("https") ? "wss" : "ws";
-        const wsUrl = `${apiUrl.replace(/^http/, wsProtocol)}/ws/${localJob.id}?token=${token}`;
+        const wsUrl = `${apiUrl.replace(/^http/, wsProtocol)}/ws/${localJob.id}`;
 
-        wsRef.current = new WebSocket(wsUrl);
+        wsRef.current = new WebSocket(wsUrl, ["clipaura-auth", accessToken]);
 
         wsRef.current.onopen = () => {
           if (isMounted) setWsConnected(true);
@@ -902,7 +907,7 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
         wsRef.current = null;
       }
     };
-  }, [localJob.id]);
+  }, [localJob.id, localJob.status, onJobStateChange]);
 
   // Scroll logs to bottom
   React.useEffect(() => {
@@ -1118,7 +1123,7 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
         }
 
         .row-expansion-panel {
-          padding: 24px;
+          padding: 32px;
           background: rgba(5, 6, 10, 0.4);
           border-top: 1px solid rgba(255, 255, 255, 0.05);
           animation: slideDown 0.25s ease-out both;
@@ -1126,7 +1131,7 @@ function ProjectRow({ job, onDelete, deletingJobId, onJobStateChange }: ProjectR
 
         .expansion-grid {
           display: grid;
-          gap: 32px;
+          gap: 40px;
           transition: all 0.3s ease;
         }
 

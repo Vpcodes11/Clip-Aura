@@ -1,0 +1,56 @@
+# Gitleaks configuration for Clip Aura
+# Detects secrets, API keys, tokens, and credentials before they enter the repo.
+
+title: "Clip Aura Secret Detection"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Allowed false positives and test secrets"
+paths = [
+  '''tests/''',
+  '''docs/''',
+  '''\.git/''',
+  '''node_modules/''',
+  '''__pycache__/''',
+  '''\.next/''',
+  '''\.refact/''',
+  '''\.pytest_cache/''',
+]
+
+# Allow test/example paths containing known-safe placeholder values
+[[rules]]
+id = "generic-api-key"
+[rules.allowlist]
+paths = [
+  '''tests/''',
+  '''\.env\.example''',
+  '''\.env\.production\.example''',
+]
+
+[[rules]]
+id = "private-key"
+[rules.allowlist]
+paths = [
+  '''tests/''',
+]
+
+# Custom detection rules for Clip Aura specific patterns
+[[rules]]
+id = "clipaura-supabase-key"
+description = "Clip Aura Supabase keys"
+regex = '''(?:supabase\.co|SUPABASE_(?:URL|ANON_KEY|JWT_SECRET|SERVICE_ROLE_KEY))\s*[:=]\s*['"]?[A-Za-z0-9_\-\.=]{20,}'''
+tags = ["supabase", "clipaura", "api-key"]
+
+[[rules]]
+id = "clipaura-stripe-key"
+description = "Clip Aura Stripe keys"
+regex = '''(?:sk_live_|sk_test_|whsec_|STRIPE_(?:SECRET|WEBHOOK))\s*[:=]\s*['"]?[A-Za-z0-9_\-]{10,}'''
+tags = ["stripe", "clipaura", "api-key"]
+
+[[rules]]
+id = "clipaura-preview-signing"
+description = "Clip Aura preview signing secret"
+regex = '''PREVIEW_SIGNING_SECRET\s*=\s*['"][^'"]+['"]'''
+tags = ["clipaura", "secret"]

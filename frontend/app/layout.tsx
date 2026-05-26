@@ -2,14 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AuthProvider } from "@/lib/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import Footer from "@/components/Footer";
 import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://clipaura.com'),
-  title: "ClipAura — AI-Powered Creator Clipping",
+  title: "ClipAura - AI-Powered Creator Clipping",
   description: "The elite engine for viral content creation. Transform long-form content into cinematic shorts with deterministic precision and ultimate privacy.",
   openGraph: {
-    title: "ClipAura — AI-Powered Creator Clipping",
+    title: "ClipAura - AI-Powered Creator Clipping",
     description: "The elite engine for viral content creation. Transform long-form content into cinematic shorts.",
     url: 'https://clipaura.com',
     siteName: 'ClipAura',
@@ -26,7 +27,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'ClipAura — AI-Powered Creator Clipping',
+    title: 'ClipAura - AI-Powered Creator Clipping',
     description: 'Transform long-form content into cinematic shorts.',
     images: ['/og-image.png'],
   },
@@ -51,7 +52,7 @@ export default function RootLayout({
               "operatingSystem": "Web",
               "offers": {
                 "@type": "Offer",
-                "price": "49.00",
+                "price": "29.00",
                 "priceCurrency": "USD"
               },
               "description": "AI-powered cinematic clipping platform for creators."
@@ -67,21 +68,20 @@ export default function RootLayout({
               <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-zinc-400">
                 <Link href="/#features" className="hover:text-white transition-colors">Features</Link>
                 <Link href="/#demo" className="hover:text-white transition-colors">Showcase</Link>
-                <Link href="/#pricing" className="hover:text-white transition-colors">Pricing</Link>
+                <Link href="/pricing" className="hover:text-white transition-colors">Pricing</Link>
               </div>
               <div className="flex items-center gap-4">
                 <Link href="/login" className="text-sm font-semibold text-zinc-400 hover:text-white transition-colors hidden sm:block">
                   Sign In
                 </Link>
-                <Link href="/#waitlist">
-                  <button className="btn-secondary px-5 py-2 text-sm">Request Access</button>
-                </Link>
+                <Link href="/#waitlist" className="btn-secondary text-sm">Request Access</Link>
               </div>
             </div>
           </nav>
           <ErrorBoundary>
             {children}
           </ErrorBoundary>
+          <Footer />
         </AuthProvider>
       </body>
     </html>

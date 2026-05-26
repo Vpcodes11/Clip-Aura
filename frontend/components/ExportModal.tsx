@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Download, Copy, Check, Share2, Phone, Sparkles, ExternalLink, Loader2 } from "lucide-react";
 import { authenticatedFetch } from "@/lib/supabase";
@@ -28,12 +29,13 @@ interface ExportModalProps {
   previewVersion?: number;
 }
 
-export default function ExportModal({ isOpen, onClose, jobId, clip, clipIndex, previewVersion = 0 }: ExportModalProps) {
+export default function ExportModal({ isOpen, onClose, jobId, clip, clipIndex }: ExportModalProps) {
   const [copied, setCopied] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadMessage, setDownloadMessage] = useState<string | null>(null);
   const [qrLoaded, setQrLoaded] = useState(false);
+  const resetTimers = useRef<number[]>([]);
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
   // Escape key closes modal
@@ -45,6 +47,13 @@ export default function ExportModal({ isOpen, onClose, jobId, clip, clipIndex, p
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    return () => {
+      resetTimers.current.forEach((timer) => window.clearTimeout(timer));
+      resetTimers.current = [];
+    };
+  }, []);
 
   if (!clip) return null;
 
@@ -79,7 +88,7 @@ Generated with ClipAura ✨`;
     try {
       await navigator.clipboard.writeText(creatorPackageText);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      resetTimers.current.push(window.setTimeout(() => setCopied(false), 2000));
     } catch (err) {
       console.error("Failed to copy text:", err);
     }
@@ -89,7 +98,7 @@ Generated with ClipAura ✨`;
     try {
       await navigator.clipboard.writeText(previewUrl);
       setCopiedLink(true);
-      setTimeout(() => setCopiedLink(false), 2000);
+      resetTimers.current.push(window.setTimeout(() => setCopiedLink(false), 2000));
     } catch (err) {
       console.error("Failed to copy link:", err);
     }
@@ -112,7 +121,7 @@ Generated with ClipAura ✨`;
       link.remove();
       URL.revokeObjectURL(objectUrl);
       setDownloadMessage("Download started.");
-      window.setTimeout(() => setDownloadMessage(null), 2400);
+      resetTimers.current.push(window.setTimeout(() => setDownloadMessage(null), 2400));
     } catch (err) {
       console.error("Failed to download clip:", err);
       setDownloadMessage("Could not download. Try again.");
@@ -163,7 +172,7 @@ Generated with ClipAura ✨`;
                 <div className="qr-container">
                   <div className="qr-frame">
                     {!qrLoaded && <div className="qr-placeholder"><Loader2 className="spin" size={24} /></div>}
-                    <img src={qrCodeUrl} alt="QR code to download video on mobile" className="qr-image" onLoad={() => setQrLoaded(true)} onError={() => setQrLoaded(true)} style={{ display: qrLoaded ? 'block' : 'none' }} />
+                    <Image src={qrCodeUrl} alt="QR code to download video on mobile" width={140} height={140} className="qr-image" unoptimized onLoad={() => setQrLoaded(true)} onError={() => setQrLoaded(true)} style={{ display: qrLoaded ? 'block' : 'none' }} />
                     <div className="qr-glow" />
                   </div>
                   <div className="qr-instructions">
@@ -289,15 +298,15 @@ Generated with ClipAura ✨`;
               width: 42px;
               height: 42px;
               border-radius: 12px;
-              background: rgba(124, 58, 237, 0.12);
-              border: 1px solid rgba(124, 58, 237, 0.25);
+              background: rgba(14, 165, 233, 0.1);
+              border: 1px solid rgba(14, 165, 233, 0.22);
               display: flex;
               align-items: center;
               justify-content: center;
             }
 
             .text-accent {
-              color: #7c3aed;
+              color: var(--accent);
             }
 
             .export-header h2 {
@@ -403,7 +412,7 @@ Generated with ClipAura ✨`;
               position: absolute;
               inset: -2px;
               border-radius: 18px;
-              background: linear-gradient(135deg, #7c3aed, #7c3aed);
+              background: var(--accent);
               z-index: -1;
               opacity: 0.25;
               filter: blur(8px);
@@ -454,14 +463,14 @@ Generated with ClipAura ✨`;
               text-decoration: none;
               cursor: pointer;
               border: 0;
-              background: linear-gradient(135deg, #7c3aed, #7c3aed);
+              background: var(--accent);
               color: #ffffff;
               transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             }
 
             .download-btn:hover {
               transform: translateY(-1px);
-              box-shadow: 0 8px 24px rgba(124, 58, 237, 0.25);
+              box-shadow: 0 8px 24px rgba(14, 165, 233, 0.18);
             }
 
             .download-btn:disabled {
@@ -523,9 +532,9 @@ Generated with ClipAura ✨`;
             }
 
             .hook-val {
-              border-color: rgba(124, 58, 237, 0.15);
-              background: rgba(124, 58, 237, 0.02);
-              color: #7c3aed;
+              border-color: rgba(14, 165, 233, 0.16);
+              background: rgba(14, 165, 233, 0.025);
+              color: var(--accent-2);
               font-weight: 700;
             }
 
@@ -542,8 +551,8 @@ Generated with ClipAura ✨`;
               min-height: 46px;
               border: none;
               border-radius: 12px;
-              background: linear-gradient(135deg, rgba(124, 58, 237, 0.15), rgba(124, 58, 237, 0.15));
-              border: 1px solid rgba(124, 58, 237, 0.25);
+              background: rgba(14, 165, 233, 0.1);
+              border: 1px solid rgba(14, 165, 233, 0.22);
               color: #ffffff;
               font-size: 13px;
               font-weight: 750;
@@ -556,10 +565,10 @@ Generated with ClipAura ✨`;
             }
 
             .copy-package-btn:hover {
-              background: linear-gradient(135deg, rgba(124, 58, 237, 0.22), rgba(124, 58, 237, 0.22));
-              border-color: rgba(124, 58, 237, 0.4);
+              background: rgba(14, 165, 233, 0.16);
+              border-color: rgba(14, 165, 233, 0.34);
               transform: translateY(-1px);
-              box-shadow: 0 4px 20px rgba(124, 58, 237, 0.12);
+              box-shadow: 0 4px 20px rgba(14, 165, 233, 0.12);
             }
 
             .text-amber {

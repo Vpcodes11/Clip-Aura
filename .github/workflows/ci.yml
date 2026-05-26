@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install -r requirements.txt
+      - run: pip install pytest pytest-asyncio
+      - name: Run backend tests
+        run: pytest tests/ -v
+        env:
+          ENVIRONMENT: production
+          DEV_MODE: 'false'
+          DATABASE_URL: sqlite:///test.db
+          SUPABASE_URL: https://placeholder.supabase.co
+          SUPABASE_ANON_KEY: dummy_anon_key_for_testing
+          GROQ_API_KEY: placeholder-gsk-key
+          REDIS_URL: redis://localhost:6379/0
+          RAZORPAY_KEY_ID: rzp_test_placeholder
+          RAZORPAY_KEY_SECRET: placeholder_secret
+          RAZORPAY_WEBHOOK_SECRET: whsec_placeholder32charsmin
+          PREVIEW_SIGNING_SECRET: placeholder-preview-secret-32chars
+          LEAD_HASH_SALT: placeholder-hash-salt-16chars
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd frontend && npm ci
+      - run: cd frontend && npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
+          NEXT_PUBLIC_API_URL: http://localhost:8000
+          NEXT_PUBLIC_DEV_MODE: 'false'
+
+  frontend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd frontend && npm ci
+      - run: cd frontend && npm run lint
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: .gitleaks.toml
+
+  secret-check-pwsh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run secret hygiene check
+        shell: pwsh
+        run: ./scripts/check-secrets.ps1
+
+  python-security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install pip-audit
+      - run: pip-audit -r requirements.txt
+
+  npm-security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: cd frontend && npm audit --production
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t clip-aura .

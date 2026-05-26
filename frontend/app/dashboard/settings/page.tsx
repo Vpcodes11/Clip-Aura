@@ -5,7 +5,7 @@ export default function SettingsPage() {
     <>
       <div className="placeholder-wrapper">
         <div className="placeholder-card">
-          <div className="placeholder-icon">🔧</div>
+          <div className="placeholder-icon">S</div>
           <h2>Available in private beta</h2>
           <p>Settings and configuration modules are restricted during the private beta period. Check back shortly as we expand the Clip Aura ecosystem.</p>
           <div className="status-chip">STATUS: PRIVATE_BETA</div>
@@ -22,21 +22,31 @@ export default function SettingsPage() {
         .placeholder-card {
           width: 100%;
           max-width: 480px;
-          border: 1px solid rgba(255, 255, 255, 0.08);
+          border: 1px solid var(--hairline);
           border-radius: 20px;
-          padding: 40px 32px;
+          padding: 34px 30px;
           text-align: center;
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 16px;
-          background: rgba(10, 13, 22, 0.78);
+          gap: 14px;
+          background: var(--panel-bg);
           box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 18px 60px rgba(0, 0, 0, 0.22);
           backdrop-filter: blur(18px);
           -webkit-backdrop-filter: blur(18px);
         }
         .placeholder-icon {
-          font-size: 2.5rem;
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          display: grid;
+          place-items: center;
+          background: rgba(14, 165, 233, 0.1);
+          border: 1px solid rgba(14, 165, 233, 0.18);
+          color: #ffffff;
+          font-family: var(--font-outfit);
+          font-size: 18px;
+          font-weight: 800;
         }
         h2 {
           font-family: var(--font-outfit);
@@ -50,10 +60,10 @@ export default function SettingsPage() {
         }
         .status-chip {
           margin-top: 8px;
-          border: 1px solid rgba(124, 58, 237, 0.2);
+          border: 1px solid rgba(14, 165, 233, 0.2);
           border-radius: 999px;
           padding: 6px 14px;
-          background: rgba(124, 58, 237, 0.08);
+          background: rgba(14, 165, 233, 0.08);
           color: var(--accent);
           font-family: ui-monospace, monospace;
           font-size: 12px;
